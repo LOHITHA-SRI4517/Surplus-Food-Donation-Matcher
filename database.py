@@ -1,4 +1,4 @@
-
+```python
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
@@ -27,15 +27,16 @@ def log_event(db, donation_id, event_type, message):
             donation_id,
             event_type,
             message,
-            datetime.now(timezone.utc).isoformat()
-        )
+            datetime.now(timezone.utc).isoformat(),
+        ),
     )
 
 
 def create_users_table(db):
     """
-    Create the users table. If an older version only permitted
-    restaurant and NGO roles, migrate it without deleting users.
+    Create the users table.
+    Safely migrate older tables to support the reviewer role
+    without intentionally deleting existing user accounts.
     """
     existing = db.execute(
         """
@@ -50,10 +51,14 @@ def create_users_table(db):
         if "reviewer" not in table_sql:
             old_columns = {
                 row["name"]
-                for row in db.execute("PRAGMA table_info(users)").fetchall()
+                for row in db.execute(
+                    "PRAGMA table_info(users)"
+                ).fetchall()
             }
 
-            db.execute("ALTER TABLE users RENAME TO users_old_migration")
+            db.execute(
+                "ALTER TABLE users RENAME TO users_old_migration"
+            )
 
             db.execute(
                 """
@@ -70,35 +75,42 @@ def create_users_table(db):
                 """
             )
 
-            required = {
-                "id", "username", "password_hash",
-                "role", "restaurant_name", "ngo_id"
+            required_columns = {
+                "id",
+                "username",
+                "password_hash",
+                "role",
+                "restaurant_name",
+                "ngo_id",
             }
 
-            if required.issubset(old_columns):
+            if required_columns.issubset(old_columns):
                 db.execute(
                     """
-                    INSERT INTO users
-                        (id, username, password_hash, role,
-                         restaurant_name, ngo_id)
-                    SELECT id, username, password_hash, role,
-                           restaurant_name, ngo_id
+                    INSERT INTO users (
+                        id, username, password_hash, role,
+                        restaurant_name, ngo_id
+                    )
+                    SELECT
+                        id, username, password_hash, role,
+                        restaurant_name, ngo_id
                     FROM users_old_migration
                     """
                 )
-            else:
-                # Preserve accounts that can be migrated safely.
-                if {
-                    "username", "password_hash", "role"
-                }.issubset(old_columns):
-                    db.execute(
-                        """
-                        INSERT INTO users
-                            (username, password_hash, role)
-                        SELECT username, password_hash, role
-                        FROM users_old_migration
-                        """
+            elif {
+                "username",
+                "password_hash",
+                "role",
+            }.issubset(old_columns):
+                db.execute(
+                    """
+                    INSERT INTO users (
+                        username, password_hash, role
                     )
+                    SELECT username, password_hash, role
+                    FROM users_old_migration
+                    """
+                )
 
             db.execute("DROP TABLE users_old_migration")
 
@@ -117,6 +129,33 @@ def create_users_table(db):
             )
             """
         )
+
+
+def migrate_pickup_evidence_columns(db):
+    """
+    Add pickup evidence fields to an existing database.
+    Existing pickup records are preserved.
+    """
+    existing_columns = {
+        row["name"]
+        for row in db.execute(
+            "PRAGMA table_info(pickups)"
+        ).fetchall()
+    }
+
+    required_columns = {
+        "evidence_filename": "TEXT",
+        "collected_at": "TEXT",
+        "collected_by": "TEXT",
+        "collection_notes": "TEXT",
+    }
+
+    for column_name, column_type in required_columns.items():
+        if column_name not in existing_columns:
+            db.execute(
+                f"ALTER TABLE pickups ADD COLUMN "
+                f"{column_name} {column_type}"
+            )
 
 
 def init_db():
@@ -173,31 +212,58 @@ def init_db():
                 location TEXT NOT NULL,
                 location_confirmed INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
+                evidence_filename TEXT,
+                collected_at TEXT,
+                collected_by TEXT,
+                collection_notes TEXT,
                 FOREIGN KEY (donation_id) REFERENCES donations(id)
             );
             """
         )
 
+        # Safely add evidence columns when upgrading an older database.
+        migrate_pickup_evidence_columns(db)
+
         demo_ngos = [
             (
-                "HOPE001", "Hope Foundation", "Kurnool",
-                "Cooked Meals, Bakery, Fruits", 100, 1
+                "HOPE001",
+                "Hope Foundation",
+                "Kurnool",
+                "Cooked Meals, Bakery, Fruits",
+                100,
+                1,
             ),
             (
-                "AKSH001", "Akshaya Trust", "Kurnool",
-                "Cooked Meals, Vegetables", 80, 1
+                "AKSH001",
+                "Akshaya Trust",
+                "Kurnool",
+                "Cooked Meals, Vegetables",
+                80,
+                1,
             ),
             (
-                "HELP001", "Helping Hands", "Kurnool",
-                "Cooked Meals, Bakery, Fruits, Vegetables", 60, 1
+                "HELP001",
+                "Helping Hands",
+                "Kurnool",
+                "Cooked Meals, Bakery, Fruits, Vegetables",
+                60,
+                1,
             ),
             (
-                "CARE001", "Care & Share", "Kurnool",
-                "Bakery, Fruits, Vegetables", 50, 1
+                "CARE001",
+                "Care & Share",
+                "Kurnool",
+                "Bakery, Fruits, Vegetables",
+                50,
+                1,
             ),
             (
-                "MEAL001", "Meal Support Network", "Kurnool",
-                "Cooked Meals", 120, 1
+                "MEAL001",
+                "Meal Support Network",
+                "Kurnool",
+                "Cooked Meals",
+                120,
+                1,
             ),
         ]
 
@@ -208,13 +274,13 @@ def init_db():
                     (code, name, city, categories, capacity, available)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                ngo
+                ngo,
             )
 
-        # Create or safely migrate the users table after NGOs exist.
+        # Create or safely migrate users after the NGOs table exists.
         create_users_table(db)
 
-        # Demo accounts for this local prototype.
+        # Demo accounts are inserted only when they do not already exist.
         demo_users = [
             ("REST001", "demo123", "restaurant", "Green Leaf Kitchen", None),
             ("HOPE001", "hope123", "ngo", None, "HOPE001"),
@@ -231,7 +297,7 @@ def init_db():
             if ngo_code:
                 ngo_row = db.execute(
                     "SELECT id FROM ngos WHERE code = ?",
-                    (ngo_code,)
+                    (ngo_code,),
                 ).fetchone()
 
                 if ngo_row is None:
@@ -241,15 +307,16 @@ def init_db():
 
             existing_user = db.execute(
                 "SELECT id FROM users WHERE username = ?",
-                (username,)
+                (username,),
             ).fetchone()
 
             if existing_user is None:
                 db.execute(
                     """
-                    INSERT INTO users
-                        (username, password_hash, role,
-                         restaurant_name, ngo_id)
+                    INSERT INTO users (
+                        username, password_hash, role,
+                        restaurant_name, ngo_id
+                    )
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (
@@ -257,6 +324,13 @@ def init_db():
                         generate_password_hash(password),
                         role,
                         restaurant_name,
-                        ngo_id
-                    )
+                        ngo_id,
+                    ),
                 )
+
+
+if __name__ == "__main__":
+    init_db()
+    print("FoodBridge database initialized successfully.")
+    print("Pickup evidence columns are ready.")
+```
