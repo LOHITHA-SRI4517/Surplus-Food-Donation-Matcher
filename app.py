@@ -12,7 +12,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import get_db, init_db, log_event
 from services.safety_agent import check_food_safety
-from services.matching_agent import find_best_match
 from services.workflow import can_create_pickup
 
 
@@ -40,8 +39,6 @@ def parse_local_datetime(value):
 def home_for_role(role=None):
     role = role or session.get("role")
 
-    # FIX: Restaurants now open the dashboard containing
-    # the Register a Food Donation form.
     if role in ("restaurant", "ngo"):
         return url_for("dashboard")
     if role == "reviewer":
@@ -397,7 +394,6 @@ def logout():
     return redirect(url_for("login"))
 
 
-# FIX: Both restaurant and NGO accounts can now open this dashboard.
 @app.route("/dashboard")
 @login_required
 @role_required("restaurant", "ngo")
@@ -422,6 +418,7 @@ def donations_page():
     return render_template("donations.html", donations=donations)
 
 
+# Updated: use the NGO selected in the donation form.
 @app.route("/donate", methods=["POST"])
 @role_required("restaurant")
 def donate():
@@ -432,8 +429,10 @@ def donate():
     dropoff_location = request.form.get(
         "dropoff_location", ""
     ).strip()
+    ngo_id_text = request.form.get("ngo_id", "").strip()
 
     try:
+        ngo_id = int(ngo_id_text)
         quantity = int(request.form.get("quantity", "0"))
         prepared_at = parse_local_datetime(
             request.form.get("prepared_at", "")
@@ -443,7 +442,7 @@ def donate():
         )
     except (ValueError, TypeError):
         flash(
-            "Please enter valid quantity and date/time values.",
+            "Please select an NGO and enter valid quantity and date/time values.",
             "error"
         )
         return redirect(home_for_role())
@@ -475,22 +474,63 @@ def donate():
         )
         return redirect(home_for_role())
 
-    safety_result = check_food_safety(
-        category=category,
-        prepared_at=prepared_at.isoformat(),
-        now=now.astimezone(timezone.utc),
-    )
-
-    if isinstance(safety_result, dict):
-        safety_ok = safety_result.get("safe", False)
-        safety_reason = safety_result.get(
-            "reason", "Food did not pass the safety check."
-        )
-    else:
-        safety_ok = bool(safety_result)
-        safety_reason = "Food did not pass the safety check."
-
     with get_db() as db:
+        ngo = db.execute(
+            """
+            SELECT id, name, city, categories, capacity, available
+            FROM ngos
+            WHERE id = ?
+            """,
+            (ngo_id,)
+        ).fetchone()
+
+        if ngo is None:
+            flash("Selected NGO does not exist.", "error")
+            return redirect(home_for_role())
+
+        if not ngo["available"]:
+            flash(
+                "This NGO is currently unavailable. Please select another NGO.",
+                "error"
+            )
+            return redirect(home_for_role())
+
+        if ngo["capacity"] < quantity:
+            flash(
+                f"{ngo['name']} does not have enough capacity for "
+                f"{quantity} servings/items.",
+                "error"
+            )
+            return redirect(home_for_role())
+
+        supported_categories = [
+            item.strip().casefold()
+            for item in (ngo["categories"] or "").split(",")
+        ]
+
+        if category.casefold() not in supported_categories:
+            flash(
+                f"{ngo['name']} does not support the {category} category.",
+                "error"
+            )
+            return redirect(home_for_role())
+
+        # Food safety must pass before approval.
+        safety_result = check_food_safety(
+            category=category,
+            prepared_at=prepared_at.isoformat(),
+            now=now.astimezone(timezone.utc),
+        )
+
+        if isinstance(safety_result, dict):
+            safety_ok = safety_result.get("safe", False)
+            safety_reason = safety_result.get(
+                "reason", "Food did not pass the safety check."
+            )
+        else:
+            safety_ok = bool(safety_result)
+            safety_reason = "Food did not pass the safety check."
+
         status = (
             "AWAITING_HUMAN_APPROVAL"
             if safety_ok else "SAFETY_REJECTED"
@@ -504,13 +544,13 @@ def donate():
                 prepared_at, pickup_deadline, dropoff_location,
                 status, matched_ngo_id, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 restaurant, food_name, category, quantity, city,
                 prepared_at.isoformat(),
                 pickup_deadline.isoformat(),
-                dropoff_location, status, utc_now()
+                dropoff_location, status, ngo_id, utc_now()
             )
         )
 
@@ -536,45 +576,14 @@ def donate():
             "Donation passed the configured initial time-window check."
         )
 
-        matches = find_best_match(db, category, city, quantity)
-
-        if not matches:
-            db.execute(
-                "UPDATE donations SET status = ? WHERE id = ?",
-                ("NO_NGO_MATCH", donation_id)
-            )
-            log_event(
-                db, donation_id, "MATCHING_SKIPPED",
-                "No suitable NGO was found for this donation."
-            )
-            flash(
-                "No suitable NGO was found for this donation.",
-                "error"
-            )
-            return redirect(home_for_role())
-
-        best_match = matches[0]
-
-        db.execute(
-            """
-            UPDATE donations
-            SET matched_ngo_id = ?, status = ?
-            WHERE id = ?
-            """,
-            (
-                best_match["id"],
-                "AWAITING_HUMAN_APPROVAL",
-                donation_id
-            )
-        )
-
         log_event(
             db, donation_id, "NGO_MATCHED",
-            f"Matched with {best_match['name']}. Awaiting human review."
+            f"Restaurant selected {ngo['name']}. Awaiting human review."
         )
 
     flash(
-        "Donation registered and matched. Waiting for human approval.",
+        f"Donation registered and assigned to {ngo['name']}. "
+        "Waiting for human approval.",
         "success"
     )
     return redirect(home_for_role())
@@ -634,10 +643,7 @@ def approve(donation_id):
             "Waiting for the matched NGO to respond."
         )
 
-    flash(
-        "Donation approved and sent to the matched NGO.",
-        "success"
-    )
+    flash("Donation approved and sent to the matched NGO.", "success")
     return redirect(home_for_role())
 
 
@@ -672,6 +678,7 @@ def ngo_action(donation_id, action):
                 f"Rejected by matched NGO {session['username']}."
             )
             flash("Donation rejected.", "success")
+
         else:
             db.execute(
                 "UPDATE donations SET status = ? WHERE id = ?",
