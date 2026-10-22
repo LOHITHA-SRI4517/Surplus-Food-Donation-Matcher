@@ -1,4 +1,3 @@
-```python
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import os
@@ -1146,4 +1145,3 @@ with app.app_context():
 
 if __name__ == "__main__":
     app.run(debug=True)
-```
