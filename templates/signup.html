@@ -1,0 +1,154 @@
+
+{% extends "base.html" %}
+
+{% block title %}Sign Up | Surplus Donation{% endblock %}
+
+{% block content %}
+<section class="login-container">
+    <div class="login-card">
+        <p class="eyebrow">JOIN SURPLUS DONATION</p>
+        <h1>Create Account</h1>
+        <p>Register your restaurant or NGO to get started.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('signup') }}" id="signupForm">
+            <div class="form-group">
+                <label for="role">Register As</label>
+                <select id="role" name="role" required>
+                    <option value="">Select account type</option>
+                    <option value="restaurant">Restaurant</option>
+                    <option value="ngo">NGO</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    minlength="4"
+                    maxlength="50"
+                    placeholder="Choose a username"
+                    autocomplete="username"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="organization_name" id="organizationLabel">
+                    Restaurant / NGO Name
+                </label>
+                <input
+                    type="text"
+                    id="organization_name"
+                    name="organization_name"
+                    maxlength="100"
+                    placeholder="Enter restaurant or NGO name"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    minlength="8"
+                    placeholder="Minimum 8 characters"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="city">City</label>
+                <input
+                    type="text"
+                    id="city"
+                    name="city"
+                    maxlength="100"
+                    placeholder="Enter your city"
+                    required
+                >
+            </div>
+
+            <div id="ngoFields" hidden>
+                <div class="form-group">
+                    <label for="categories">Food Categories Needed</label>
+                    <input
+                        type="text"
+                        id="categories"
+                        name="categories"
+                        placeholder="Example: Vegetarian, Meals, Bakery"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="capacity">Daily Food Capacity</label>
+                    <input
+                        type="number"
+                        id="capacity"
+                        name="capacity"
+                        min="1"
+                        step="1"
+                        placeholder="Example: 100"
+                    >
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="signupButton">
+                Create Account
+            </button>
+        </form>
+
+        <p class="login-footer">
+            Already have an account?
+            <a href="{{ url_for('login') }}">Login here</a>
+        </p>
+    </div>
+</section>
+
+<script>
+    const roleSelect = document.getElementById("role");
+    const ngoFields = document.getElementById("ngoFields");
+    const categoriesInput = document.getElementById("categories");
+    const capacityInput = document.getElementById("capacity");
+    const organizationLabel = document.getElementById("organizationLabel");
+    const organizationInput = document.getElementById("organization_name");
+    const signupButton = document.getElementById("signupButton");
+
+    function updateSignupForm() {
+        const isNgo = roleSelect.value === "ngo";
+
+        ngoFields.hidden = !isNgo;
+        categoriesInput.required = isNgo;
+        capacityInput.required = isNgo;
+
+        organizationLabel.textContent = isNgo
+            ? "NGO Name"
+            : "Restaurant Name";
+
+        organizationInput.placeholder = isNgo
+            ? "Enter your NGO name"
+            : "Enter your restaurant name";
+
+        signupButton.textContent = isNgo
+            ? "Register NGO"
+            : "Create Account";
+    }
+
+    roleSelect.addEventListener("change", updateSignupForm);
+    updateSignupForm();
+</script>
+{% endblock %}

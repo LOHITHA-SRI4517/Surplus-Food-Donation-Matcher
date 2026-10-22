@@ -1,0 +1,257 @@
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Surplus Donation{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <h1>FoodBridge Dashboard</h1>
+    <p>
+        Welcome, {{ session.get('username', 'User') }}!
+        Manage donations, approvals and pickup tracking.
+    </p>
+</section>
+
+<div class="stats-grid">
+    <div class="dashboard-card">
+        <p>Total visible donations</p>
+        <div class="stat-number">{{ summary.total }}</div>
+    </div>
+
+    <div class="dashboard-card">
+        <p>Matched donations</p>
+        <div class="stat-number">{{ summary.eligible }}</div>
+    </div>
+
+    <div class="dashboard-card">
+        <p>Awaiting human approval</p>
+        <div class="stat-number">{{ summary.approval }}</div>
+    </div>
+
+    <div class="dashboard-card">
+        <p>Completed pickups</p>
+        <div class="stat-number">{{ summary.pickups }}</div>
+    </div>
+</div>
+
+{% if session.get('role') == 'restaurant' %}
+<section class="panel">
+    <h2>Register a Food Donation</h2>
+    <p>Your restaurant account can register donations and track its own records.</p>
+
+    <form method="POST" action="{{ url_for('donate') }}">
+        <div class="form-group">
+            <label for="food_name">Food name</label>
+            <input id="food_name" name="food_name"
+                   placeholder="Example: Vegetable rice" required>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Food category</label>
+            <select id="category" name="category" required>
+                <option value="">Select category</option>
+                <option value="Cooked Meals">Cooked Meals</option>
+                <option value="Bakery">Bakery</option>
+                <option value="Fruits">Fruits</option>
+                <option value="Vegetables">Vegetables</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="quantity">Quantity (servings/items)</label>
+            <input id="quantity" name="quantity" type="number"
+                   min="1" required>
+        </div>
+
+        <div class="form-group">
+            <label for="city">City</label>
+            <input id="city" name="city" value="Kurnool" required>
+        </div>
+
+        <div class="form-group">
+            <label for="prepared_at">Food prepared at</label>
+            <input id="prepared_at" name="prepared_at"
+                   type="datetime-local" required>
+        </div>
+
+        <div class="form-group">
+            <label for="pickup_deadline">Pickup deadline</label>
+            <input id="pickup_deadline" name="pickup_deadline"
+                   type="datetime-local" required>
+        </div>
+
+        <div class="form-group">
+            <label for="dropoff_location">Pickup / drop-off location</label>
+            <input id="dropoff_location" name="dropoff_location"
+                   placeholder="Enter full pickup location" required>
+        </div>
+
+        <button type="submit">Register Donation</button>
+    </form>
+</section>
+{% endif %}
+
+{% if session.get('role') == 'reviewer' %}
+<section class="panel">
+    <h2>Human Review</h2>
+    <p>Review eligible donations before sending them to the matched NGO.</p>
+</section>
+{% elif session.get('role') == 'ngo' %}
+<section class="panel">
+    <h2>NGO Workspace</h2>
+    <p>You can manage donations matched to your NGO account only.</p>
+</section>
+{% endif %}
+
+<section class="panel">
+    <h2>
+        {% if session.get('role') == 'restaurant' %}
+            My Restaurant Donations
+        {% elif session.get('role') == 'ngo' %}
+            Donations Matched to My NGO
+        {% else %}
+            Donation Review and Tracking
+        {% endif %}
+    </h2>
+
+    {% if donations %}
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Food</th>
+                        <th>Quantity</th>
+                        <th>Restaurant</th>
+                        <th>Matched NGO</th>
+                        <th>Status</th>
+                        <th>Pickup deadline</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for donation in donations %}
+                    <tr>
+                        <td>#{{ donation.id }}</td>
+                        <td>
+                            <strong>{{ donation.food_name }}</strong>
+                            <br>
+                            <span class="muted">{{ donation.category }}</span>
+                            <br>
+                            <span class="muted">{{ donation.city }}</span>
+                        </td>
+                        <td>{{ donation.quantity }}</td>
+                        <td>{{ donation.restaurant }}</td>
+                        <td>{{ donation.ngo_name or "Not matched" }}</td>
+                        <td>
+                            <span class="status">{{ donation.status }}</span>
+                        </td>
+                        <td>{{ donation.pickup_deadline }}</td>
+                        <td>
+                            <div class="action-row">
+                                {% if session.get('role') == 'reviewer'
+                                    and donation.status == 'AWAITING_HUMAN_APPROVAL' %}
+                                    <form method="POST"
+                                          action="{{ url_for('approve', donation_id=donation.id) }}"
+                                          data-confirm="Approve this donation for NGO review?">
+                                        <button type="submit">Approve</button>
+                                    </form>
+                                {% endif %}
+
+                                {% if session.get('role') == 'ngo'
+                                    and donation.status == 'AWAITING_NGO_ACCEPTANCE' %}
+                                    <form method="POST"
+                                          action="{{ url_for('ngo_action', donation_id=donation.id, action='accept') }}"
+                                          data-confirm="Accept this donation?">
+                                        <button type="submit">Accept</button>
+                                    </form>
+
+                                    <form method="POST"
+                                          action="{{ url_for('ngo_action', donation_id=donation.id, action='reject') }}"
+                                          data-confirm="Are you sure you want to reject this donation?">
+                                        <button type="submit" class="button-danger">Reject</button>
+                                    </form>
+                                {% endif %}
+
+                                {% if session.get('role') == 'ngo'
+                                    and donation.status in ['NGO_ACCEPTED', 'AWAITING_NGO_ACCEPTANCE'] %}
+                                    <form method="POST"
+                                          action="{{ url_for('confirm_location', donation_id=donation.id) }}"
+                                          data-confirm="Confirm that the pickup location is correct?">
+                                        <button type="submit">Confirm Location</button>
+                                    </form>
+                                {% endif %}
+
+                                {% if session.get('role') == 'ngo'
+                                    and donation.status == 'NGO_ACCEPTED' %}
+                                    <form method="POST"
+                                          action="{{ url_for('collect_pickup', donation_id=donation.id) }}"
+                                          data-confirm="Confirm that this food donation has been collected?">
+                                        <button type="submit">Mark Collected</button>
+                                    </form>
+                                {% endif %}
+
+                                {% if session.get('role') == 'restaurant'
+                                    and donation.status not in ['COLLECTED', 'NGO_REJECTED', 'SAFETY_REJECTED'] %}
+                                    <form method="POST"
+                                          action="{{ url_for('update_location', donation_id=donation.id) }}">
+                                        <label for="location-{{ donation.id }}">Update location</label>
+                                        <input id="location-{{ donation.id }}"
+                                               name="dropoff_location"
+                                               placeholder="New pickup location"
+                                               required>
+                                        <button type="submit">Update</button>
+                                    </form>
+                                {% endif %}
+
+                                {% if session.get('role') == 'restaurant'
+                                    and donation.status == 'AWAITING_HUMAN_APPROVAL' %}
+                                    <span class="muted">Waiting for review</span>
+                                {% endif %}
+
+                                {% if session.get('role') == 'ngo'
+                                    and donation.status not in ['AWAITING_NGO_ACCEPTANCE', 'NGO_ACCEPTED'] %}
+                                    <span class="muted">No action available</span>
+                                {% endif %}
+
+                                {% if session.get('role') == 'reviewer'
+                                    and donation.status != 'AWAITING_HUMAN_APPROVAL' %}
+                                    <span class="muted">No review needed</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No donations to display yet</h3>
+            <p>Donations available to your account will appear here.</p>
+        </div>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h2>Recent Activity</h2>
+
+    {% if recent_events %}
+        <ul>
+            {% for event in recent_events %}
+                <li>
+                    <strong>{{ event.event_type }}</strong>
+                    - {{ event.message }}
+                    <br>
+                    <span class="muted">{{ event.created_at }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No activity recorded for the visible donations yet.</p>
+    {% endif %}
+</section>
+
+{% endblock %}
+

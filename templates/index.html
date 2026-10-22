@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Surplus Donation | Home{% endblock %}
+
+{% block content %}
+
+<section class="hero">
+  <p class="eyebrow">SMART FOOD DONATION MATCHING</p>
+
+  <h1>Good Food Should Never Go to Waste.</h1>
+
+  <p class="hero-text">
+    Connect surplus food with NGOs serving people in need —
+    safely, transparently and responsibly.
+  </p>
+
+  <div class="actions">
+    <a class="btn btn-primary" href="/donations">
+      🍲 Register a Donation &rarr;
+    </a>
+
+    <a class="btn btn-secondary" href="/dashboard">
+      📊 Open Dashboard
+    </a>
+  </div>
+</section>
+
+<section class="section">
+  <p class="eyebrow">HOW IT WORKS</p>
+  <h2>From Surplus to Shared Meals</h2>
+
+  <div class="cards">
+
+    <article class="card">
+      <div class="card-icon">🍲</div>
+      <h3>01. Donate</h3>
+      <p>
+        Register food, quantity, preparation time and collection deadline.
+      </p>
+    </article>
+
+    <article class="card">
+      <div class="card-icon">🤝</div>
+      <h3>02. Match</h3>
+      <p>
+        Check food category, NGO capacity, availability and city.
+      </p>
+    </article>
+
+    <article class="card">
+      <div class="card-icon">✅</div>
+      <h3>03. Approve &amp; Collect</h3>
+      <p>
+        Human approval, NGO acceptance and location confirmation
+        protect the workflow.
+      </p>
+    </article>
+
+  </div>
+</section>
+
+<section class="callout">
+  <h2>Safety Before Matching</h2>
+  <p>
+    In this demo, cooked meals older than four hours are rejected
+    by the configured rule. This rule is a prototype, not a complete
+    food-safety certification.
+  </p>
+</section>
+
+{% endblock %}

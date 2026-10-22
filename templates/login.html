@@ -1,0 +1,261 @@
+ {% extends "base.html" %}
+
+{% block title %}Login | FoodBridge{% endblock %}
+
+{% block content %}
+<style>
+    .login-container {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 35px 16px;
+        background: linear-gradient(135deg, #f0fdf4, #f8fafc, #ecfdf5);
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 440px;
+        padding: 36px 32px 26px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 22px;
+        box-shadow: 0 18px 45px rgba(22, 101, 52, 0.10);
+    }
+
+    .login-card .eyebrow {
+        display: inline-block;
+        margin: 0 0 12px;
+        padding: 7px 12px;
+        border-radius: 30px;
+        background: #dcfce7;
+        color: #166534;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+    }
+
+    .login-card h1 {
+        margin: 0 0 10px;
+        color: #14532d;
+        font-size: 32px;
+        font-weight: 800;
+    }
+
+    .login-card > p:not(.eyebrow):not(.login-tagline) {
+        margin: 0 0 25px;
+        color: #64748b;
+        font-size: 14px;
+        line-height: 1.7;
+    }
+
+    .login-card .form-group {
+        margin-bottom: 18px;
+    }
+
+    .login-card label {
+        display: block;
+        margin-bottom: 8px;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .login-card input,
+    .login-card select {
+        width: 100%;
+        min-height: 46px;
+        padding: 12px 13px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #1f2937;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .login-card input:focus,
+    .login-card select:focus {
+        border-color: #16a34a;
+        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+    }
+
+    .login-card .login-button {
+        width: 100%;
+        min-height: 48px;
+        margin-top: 5px;
+        border: none;
+        border-radius: 10px;
+        background: #15803d;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.2s;
+    }
+
+    .login-card .login-button:hover {
+        background: #166534;
+        transform: translateY(-1px);
+    }
+
+    .login-card .alert {
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border-radius: 9px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .login-card .alert.error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+    }
+
+    .login-card .alert.success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+    }
+
+    .login-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 24px;
+        padding: 17px 10px;
+        border-top: 1px solid #e5e7eb;
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    .signup-small-btn {
+        display: inline-block;
+        padding: 9px 14px;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        background: #f0fdf4;
+        color: #15803d;
+        font-weight: 700;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+
+    .signup-small-btn:hover {
+        background: #dcfce7;
+    }
+
+    .login-tagline {
+        margin: 4px 0 0;
+        padding-top: 16px;
+        text-align: center;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .login-tagline .tagline-icon {
+        display: block;
+        margin-bottom: 7px;
+        font-size: 23px;
+    }
+
+    .login-tagline strong {
+        display: block;
+        margin-bottom: 6px;
+        color: #166534;
+        font-size: 17px;
+    }
+
+    .login-tagline small {
+        display: block;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 480px) {
+        .login-card {
+            padding: 28px 21px 22px;
+        }
+
+        .login-card h1 {
+            font-size: 28px;
+        }
+    }
+</style>
+
+<section class="login-container">
+    <div class="login-card">
+        <p class="eyebrow">FOODBRIDGE · SURPLUS DONATION</p>
+
+        <h1>Welcome Back! 👋</h1>
+        <p>Sign in to connect surplus food with people who need it.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert {{ category }}" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label for="role">Login As</label>
+                <select id="role" name="role" required>
+                    <option value="">Select your role</option>
+                    <option value="restaurant">Restaurant</option>
+                    <option value="ngo">NGO</option>
+                    <option value="reviewer">Reviewer</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    placeholder="Enter your username"
+                    autocomplete="username"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="btn btn-primary login-button">
+                Login Securely →
+            </button>
+        </form>
+
+        <div class="login-footer">
+            <span>New to FoodBridge?</span>
+            <a class="signup-small-btn" href="{{ url_for('signup') }}">
+                Create Account →
+            </a>
+        </div>
+
+        <div class="login-tagline">
+            <span class="tagline-icon">💚</span>
+            <strong>Good Food. Better Tomorrow.</strong>
+            <small>Every meal saved brings us one step closer to a hunger-free world.</small>
+        </div>
+    </div>
+</section>
+{% endblock %}

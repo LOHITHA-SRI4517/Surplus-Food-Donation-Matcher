@@ -1,0 +1,23 @@
+
+{% extends "base.html" %}
+{% block title %}Workflow Tests | Surplus Donation{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <p class="eyebrow">VALIDATION</p>
+  <h1>Official workflow test scenarios</h1>
+  <p>Run automated assertions in the terminal before claiming the scenarios pass.</p>
+</section>
+<div class="cards">
+  <article class="card"><h3>TC1 Â· Fresh food</h3><p>Eligible food should pass the configured time check and match an NGO with compatible category, city and sufficient capacity.</p></article>
+  <article class="card"><h3>TC2 Â· Expired cooked food</h3><p>Cooked meals older than four hours must be rejected, with matching skipped and pickup blocked.</p></article>
+  <article class="card"><h3>TC3 Â· NGO pending</h3><p>Collection must not proceed before NGO acceptance.</p></article>
+  <article class="card"><h3>TC4 Â· Location changed</h3><p>Collection must remain blocked until the restaurant reconfirms the drop-off location.</p></article>
+</div>
+<section class="callout">
+  <h2>Run the tests</h2>
+  <p>Open the VS Code terminal and run:</p>
+  <pre>python -m unittest discover -s tests -v</pre>
+  <p>Only the actual test output determines whether a test passed or failed.</p>
+</section>
+{% endblock %}
+
