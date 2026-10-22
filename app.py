@@ -1,19 +1,12 @@
-﻿
+
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import os
 import sqlite3
 
 from flask import (
-    Flask,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    flash,
-    session,
-    abort,
-    make_response,
+    Flask, render_template, request, redirect, url_for,
+    flash, session, abort, make_response
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -38,22 +31,19 @@ def utc_now():
 
 
 def parse_local_datetime(value):
-    """Interpret browser datetime-local input as Indian Standard Time."""
     parsed = datetime.fromisoformat(value)
-
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=IST)
-
     return parsed
 
 
 def home_for_role(role=None):
     role = role or session.get("role")
 
-    if role == "ngo":
+    # FIX: Restaurants now open the dashboard containing
+    # the Register a Food Donation form.
+    if role in ("restaurant", "ngo"):
         return url_for("dashboard")
-    if role == "restaurant":
-        return url_for("donations_page")
     if role == "reviewer":
         return url_for("reviewer_dashboard")
 
@@ -66,9 +56,7 @@ def login_required(view):
         if "user_id" not in session:
             flash("Please log in first.", "error")
             return redirect(url_for("login"))
-
         return view(*args, **kwargs)
-
     return wrapped_view
 
 
@@ -84,9 +72,7 @@ def role_required(*allowed_roles):
                 abort(403)
 
             return view(*args, **kwargs)
-
         return wrapped_view
-
     return decorator
 
 
@@ -173,30 +159,27 @@ def get_summary(db, donations):
 
     eligible = db.execute(
         f"""
-        SELECT COUNT(*)
-        FROM donations
+        SELECT COUNT(*) FROM donations
         WHERE id IN ({placeholders})
-          AND matched_ngo_id IS NOT NULL
+        AND matched_ngo_id IS NOT NULL
         """,
         donation_ids
     ).fetchone()[0]
 
     approval = db.execute(
         f"""
-        SELECT COUNT(*)
-        FROM donations
+        SELECT COUNT(*) FROM donations
         WHERE id IN ({placeholders})
-          AND status = 'AWAITING_HUMAN_APPROVAL'
+        AND status = 'AWAITING_HUMAN_APPROVAL'
         """,
         donation_ids
     ).fetchone()[0]
 
     pickups = db.execute(
         f"""
-        SELECT COUNT(*)
-        FROM pickups
+        SELECT COUNT(*) FROM pickups
         WHERE donation_id IN ({placeholders})
-          AND status = 'COLLECTED'
+        AND status = 'COLLECTED'
         """,
         donation_ids
     ).fetchone()[0]
@@ -222,7 +205,6 @@ def render_role_dashboard():
 
         if donation_ids:
             placeholders = ",".join("?" for _ in donation_ids)
-
             recent_events = db.execute(
                 f"""
                 SELECT e.*, d.food_name
@@ -264,7 +246,6 @@ def signup():
         organization_name = request.form.get(
             "organization_name", ""
         ).strip()
-
         city = request.form.get("city", "").strip()
         categories = request.form.get("categories", "").strip()
         capacity_text = request.form.get("capacity", "").strip()
@@ -326,7 +307,6 @@ def signup():
                         """,
                         (username, password_hash, organization_name)
                     )
-
                 else:
                     ngo_code = "NGO-" + username
 
@@ -337,11 +317,8 @@ def signup():
                         VALUES (?, ?, ?, ?, ?, 1)
                         """,
                         (
-                            ngo_code,
-                            organization_name,
-                            city,
-                            categories,
-                            capacity,
+                            ngo_code, organization_name, city,
+                            categories, capacity
                         )
                     )
 
@@ -420,9 +397,10 @@ def logout():
     return redirect(url_for("login"))
 
 
+# FIX: Both restaurant and NGO accounts can now open this dashboard.
 @app.route("/dashboard")
 @login_required
-@role_required("ngo")
+@role_required("restaurant", "ngo")
 def dashboard():
     return render_role_dashboard()
 
@@ -451,7 +429,9 @@ def donate():
     food_name = request.form.get("food_name", "").strip()
     category = request.form.get("category", "").strip()
     city = request.form.get("city", "").strip()
-    dropoff_location = request.form.get("dropoff_location", "").strip()
+    dropoff_location = request.form.get(
+        "dropoff_location", ""
+    ).strip()
 
     try:
         quantity = int(request.form.get("quantity", "0"))
@@ -462,12 +442,17 @@ def donate():
             request.form.get("pickup_deadline", "")
         )
     except (ValueError, TypeError):
-        flash("Please enter valid quantity and date/time values.", "error")
+        flash(
+            "Please enter valid quantity and date/time values.",
+            "error"
+        )
         return redirect(home_for_role())
 
     now = datetime.now(IST)
 
-    if not all([restaurant, food_name, category, city, dropoff_location]):
+    if not all([
+        restaurant, food_name, category, city, dropoff_location
+    ]):
         flash("Please complete all donation fields.", "error")
         return redirect(home_for_role())
 
@@ -484,7 +469,10 @@ def donate():
         return redirect(home_for_role())
 
     if pickup_deadline <= prepared_at:
-        flash("Pickup deadline must be after preparation time.", "error")
+        flash(
+            "Pickup deadline must be after preparation time.",
+            "error"
+        )
         return redirect(home_for_role())
 
     safety_result = check_food_safety(
@@ -496,8 +484,7 @@ def donate():
     if isinstance(safety_result, dict):
         safety_ok = safety_result.get("safe", False)
         safety_reason = safety_result.get(
-            "reason",
-            "Food did not pass the safety check."
+            "reason", "Food did not pass the safety check."
         )
     else:
         safety_ok = bool(safety_result)
@@ -506,8 +493,7 @@ def donate():
     with get_db() as db:
         status = (
             "AWAITING_HUMAN_APPROVAL"
-            if safety_ok
-            else "SAFETY_REJECTED"
+            if safety_ok else "SAFETY_REJECTED"
         )
 
         cursor = db.execute(
@@ -521,16 +507,10 @@ def donate():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
             """,
             (
-                restaurant,
-                food_name,
-                category,
-                quantity,
-                city,
+                restaurant, food_name, category, quantity, city,
                 prepared_at.isoformat(),
                 pickup_deadline.isoformat(),
-                dropoff_location,
-                status,
-                utc_now(),
+                dropoff_location, status, utc_now()
             )
         )
 
@@ -567,12 +547,13 @@ def donate():
                 db, donation_id, "MATCHING_SKIPPED",
                 "No suitable NGO was found for this donation."
             )
-            flash("No suitable NGO was found for this donation.", "error")
+            flash(
+                "No suitable NGO was found for this donation.",
+                "error"
+            )
             return redirect(home_for_role())
 
         best_match = matches[0]
-        ngo_id = best_match["id"]
-        ngo_name = best_match["name"]
 
         db.execute(
             """
@@ -580,12 +561,16 @@ def donate():
             SET matched_ngo_id = ?, status = ?
             WHERE id = ?
             """,
-            (ngo_id, "AWAITING_HUMAN_APPROVAL", donation_id)
+            (
+                best_match["id"],
+                "AWAITING_HUMAN_APPROVAL",
+                donation_id
+            )
         )
 
         log_event(
             db, donation_id, "NGO_MATCHED",
-            f"Matched with {ngo_name}. Awaiting human review."
+            f"Matched with {best_match['name']}. Awaiting human review."
         )
 
     flash(
@@ -602,11 +587,17 @@ def approve(donation_id):
         donation = get_donation(db, donation_id)
 
         if donation["status"] != "AWAITING_HUMAN_APPROVAL":
-            flash("This donation is not waiting for human approval.", "error")
+            flash(
+                "This donation is not waiting for human approval.",
+                "error"
+            )
             return redirect(home_for_role())
 
         if donation["matched_ngo_id"] is None:
-            flash("Cannot approve a donation without an NGO match.", "error")
+            flash(
+                "Cannot approve a donation without an NGO match.",
+                "error"
+            )
             return redirect(home_for_role())
 
         db.execute(
@@ -643,7 +634,10 @@ def approve(donation_id):
             "Waiting for the matched NGO to respond."
         )
 
-    flash("Donation approved and sent to the matched NGO.", "success")
+    flash(
+        "Donation approved and sent to the matched NGO.",
+        "success"
+    )
     return redirect(home_for_role())
 
 
@@ -658,7 +652,10 @@ def ngo_action(donation_id, action):
         ensure_matched_ngo(donation)
 
         if donation["status"] != "AWAITING_NGO_ACCEPTANCE":
-            flash("This donation is not awaiting NGO acceptance.", "error")
+            flash(
+                "This donation is not awaiting NGO acceptance.",
+                "error"
+            )
             return redirect(home_for_role())
 
         if action == "reject":
@@ -675,7 +672,6 @@ def ngo_action(donation_id, action):
                 f"Rejected by matched NGO {session['username']}."
             )
             flash("Donation rejected.", "success")
-
         else:
             db.execute(
                 "UPDATE donations SET status = ? WHERE id = ?",
@@ -695,8 +691,10 @@ def ngo_action(donation_id, action):
                     VALUES (?, ?, ?, 0, ?)
                     """,
                     (
-                        donation_id, "BLOCKED_LOCATION_RECONFIRMATION",
-                        donation["dropoff_location"], utc_now()
+                        donation_id,
+                        "BLOCKED_LOCATION_RECONFIRMATION",
+                        donation["dropoff_location"],
+                        utc_now()
                     )
                 )
             elif pickup["location_confirmed"]:
@@ -729,7 +727,9 @@ def ngo_action(donation_id, action):
 @app.route("/location/<int:donation_id>", methods=["POST"])
 @role_required("restaurant")
 def update_location(donation_id):
-    new_location = request.form.get("dropoff_location", "").strip()
+    new_location = request.form.get(
+        "dropoff_location", ""
+    ).strip()
 
     if not new_location:
         flash("Location cannot be empty.", "error")
@@ -742,7 +742,10 @@ def update_location(donation_id):
         if donation["status"] in (
             "COLLECTED", "NGO_REJECTED", "SAFETY_REJECTED"
         ):
-            flash("Location cannot be changed at this stage.", "error")
+            flash(
+                "Location cannot be changed at this stage.",
+                "error"
+            )
             return redirect(home_for_role())
 
         db.execute(
@@ -774,7 +777,10 @@ def update_location(donation_id):
             "Restaurant changed the pickup location. NGO reconfirmation is required."
         )
 
-    flash("Location updated. The NGO must reconfirm before pickup.", "success")
+    flash(
+        "Location updated. The NGO must reconfirm before pickup.",
+        "success"
+    )
     return redirect(home_for_role())
 
 
@@ -788,7 +794,10 @@ def confirm_location(donation_id):
         if donation["status"] not in (
             "NGO_ACCEPTED", "AWAITING_NGO_ACCEPTANCE"
         ):
-            flash("Location cannot be confirmed at this stage.", "error")
+            flash(
+                "Location cannot be confirmed at this stage.",
+                "error"
+            )
             return redirect(home_for_role())
 
         pickup = db.execute(
@@ -821,7 +830,11 @@ def confirm_location(donation_id):
                 SET location = ?, location_confirmed = 1, status = ?
                 WHERE donation_id = ?
                 """,
-                (donation["dropoff_location"], new_status, donation_id)
+                (
+                    donation["dropoff_location"],
+                    new_status,
+                    donation_id
+                )
             )
 
         log_event(
@@ -894,101 +907,44 @@ def tests_page():
 
 @app.errorhandler(403)
 def forbidden(_error):
-    html = """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>NGO Access Only | Surplus Donation</title>
-        <style>
-            * { box-sizing: border-box; }
-
-            body {
-                margin: 0;
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 20px;
-                font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, #ecfdf5, #eff6ff);
-            }
-
-            .card {
-                width: 100%;
-                max-width: 520px;
-                padding: 38px 26px;
-                text-align: center;
-                background: white;
-                border-top: 6px solid #16a34a;
-                border-radius: 22px;
-                box-shadow: 0 12px 40px rgba(0, 0, 0, .10);
-            }
-
-            .icon { font-size: 54px; }
-
-            h1 {
-                color: #166534;
-                font-size: 30px;
-                margin: 16px 0 10px;
-            }
-
-            .subtitle { color: #64748b; line-height: 1.6; }
-
-            .message {
-                margin: 24px 0;
-                padding: 20px;
-                border: 1px solid #bbf7d0;
-                border-radius: 14px;
-                background: #f0fdf4;
-                color: #475569;
-                line-height: 1.8;
-            }
-
-            .message h3 { color: #166534; margin-top: 0; }
-
-            .button {
-                display: inline-block;
-                padding: 13px 22px;
-                border-radius: 10px;
-                background: #16a34a;
-                color: white;
-                text-decoration: none;
-                font-weight: bold;
-            }
-
-            .button:hover { background: #15803d; }
-
-            .footer {
-                margin-top: 24px;
-                color: #64748b;
-                font-size: 13px;
-            }
-        </style>
-    </head>
-    <body>
-        <main class="card">
-            <div class="icon">🛡️</div>
-            <h1>Access Restricted</h1>
-            <p class="subtitle">This page is not available for your account role.</p>
-
-            <div class="message">
-                <h3>💚 Hello, Food-Saving Hero!</h3>
-                This section is available only to authorized accounts.
-                Please log in with the correct account to continue helping
-                surplus food reach people in need.
-            </div>
-
-            <a class="button" href="/login">Login to Your Account →</a>
-
-            <p class="footer">Together, let's make every meal count.</p>
-        </main>
-    </body>
-    </html>
-    """
-
-    response = make_response(html, 403)
+    response = make_response(
+        """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Access Restricted | FoodBridge</title>
+            <style>
+                body {
+                    margin: 0; min-height: 100vh; display: grid;
+                    place-items: center; padding: 20px;
+                    font-family: Arial, sans-serif;
+                    background: #ecfdf5; color: #166534;
+                }
+                main {
+                    max-width: 520px; padding: 32px; text-align: center;
+                    background: white; border-radius: 18px;
+                    box-shadow: 0 12px 40px #0001;
+                }
+                a {
+                    display: inline-block; padding: 12px 20px;
+                    background: #16a34a; color: white;
+                    border-radius: 8px; text-decoration: none;
+                }
+            </style>
+        </head>
+        <body>
+            <main>
+                <h1>Access Restricted</h1>
+                <p>This page is not available for your account role.</p>
+                <a href="/login">Login to Your Account</a>
+            </main>
+        </body>
+        </html>
+        """,
+        403
+    )
     response.headers["Content-Type"] = "text/html; charset=utf-8"
     return response
 
