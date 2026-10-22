@@ -1,14 +1,17 @@
-
+```python
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import os
 import sqlite3
+import uuid
+from pathlib import Path
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, session, abort, make_response
+    flash, session, abort, make_response, send_from_directory
 )
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
 from database import get_db, init_db, log_event
 from services.safety_agent import check_food_safety
@@ -20,6 +23,14 @@ app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY",
     "foodbridge-local-demo-key-change-before-deployment"
 )
+
+# Upload evidence outside the static website directory.
+UPLOAD_FOLDER = Path(app.root_path) / "pickup_evidence"
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
 
 IST = timezone(timedelta(hours=5, minutes=30))
 VALID_ROLES = ("restaurant", "ngo", "reviewer")
@@ -104,12 +115,20 @@ def ensure_matched_ngo(donation):
 def get_visible_donations(db):
     role = session.get("role")
 
+    evidence_fields = """
+        p.evidence_filename AS evidence_filename,
+        p.collected_at AS collected_at,
+        p.collected_by AS collected_by,
+        p.collection_notes AS collection_notes
+    """
+
     if role == "restaurant":
         return db.execute(
-            """
-            SELECT d.*, n.name AS ngo_name
+            f"""
+            SELECT d.*, n.name AS ngo_name, {evidence_fields}
             FROM donations d
             LEFT JOIN ngos n ON n.id = d.matched_ngo_id
+            LEFT JOIN pickups p ON p.donation_id = d.id
             WHERE d.restaurant = ?
             ORDER BY d.id DESC
             """,
@@ -118,10 +137,11 @@ def get_visible_donations(db):
 
     if role == "ngo":
         return db.execute(
-            """
-            SELECT d.*, n.name AS ngo_name
+            f"""
+            SELECT d.*, n.name AS ngo_name, {evidence_fields}
             FROM donations d
             LEFT JOIN ngos n ON n.id = d.matched_ngo_id
+            LEFT JOIN pickups p ON p.donation_id = d.id
             WHERE d.matched_ngo_id = ?
             ORDER BY d.id DESC
             """,
@@ -130,10 +150,11 @@ def get_visible_donations(db):
 
     if role == "reviewer":
         return db.execute(
-            """
-            SELECT d.*, n.name AS ngo_name
+            f"""
+            SELECT d.*, n.name AS ngo_name, {evidence_fields}
             FROM donations d
             LEFT JOIN ngos n ON n.id = d.matched_ngo_id
+            LEFT JOIN pickups p ON p.donation_id = d.id
             ORDER BY d.id DESC
             """
         ).fetchall()
@@ -223,6 +244,38 @@ def render_role_dashboard():
         summary=summary,
         recent_events=recent_events,
     )
+
+
+def allowed_evidence_extension(filename):
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    )
+
+
+def image_signature_is_valid(file_storage, extension):
+    """
+    Check common image file signatures rather than trusting
+    only the filename or browser-supplied MIME type.
+    """
+    file_storage.stream.seek(0)
+    header = file_storage.stream.read(16)
+    file_storage.stream.seek(0)
+
+    if extension in ("jpg", "jpeg"):
+        return header.startswith(b"\xff\xd8\xff")
+
+    if extension == "png":
+        return header.startswith(b"\x89PNG\r\n\x1a\n")
+
+    if extension == "webp":
+        return (
+            len(header) >= 12
+            and header[:4] == b"RIFF"
+            and header[8:12] == b"WEBP"
+        )
+
+    return False
 
 
 @app.route("/")
@@ -418,7 +471,6 @@ def donations_page():
     return render_template("donations.html", donations=donations)
 
 
-# Updated: use the NGO selected in the donation form.
 @app.route("/donate", methods=["POST"])
 @role_required("restaurant")
 def donate():
@@ -515,7 +567,6 @@ def donate():
             )
             return redirect(home_for_role())
 
-        # Food safety must pass before approval.
         safety_result = check_food_safety(
             category=category,
             prepared_at=prepared_at.isoformat(),
@@ -856,6 +907,41 @@ def confirm_location(donation_id):
 @app.route("/pickup/<int:donation_id>/collect", methods=["POST"])
 @role_required("ngo")
 def collect_pickup(donation_id):
+    evidence_file = request.files.get("evidence")
+    notes = request.form.get("evidence_notes", "").strip()
+
+    if len(notes) > 500:
+        flash("Evidence notes must be 500 characters or fewer.", "error")
+        return redirect(home_for_role())
+
+    if evidence_file is None or not evidence_file.filename:
+        flash(
+            "Upload a pickup evidence photo before marking collected.",
+            "error"
+        )
+        return redirect(home_for_role())
+
+    original_filename = secure_filename(evidence_file.filename)
+
+    if (
+        not original_filename
+        or not allowed_evidence_extension(original_filename)
+    ):
+        flash(
+            "Upload a JPG, JPEG, PNG, or WEBP image.",
+            "error"
+        )
+        return redirect(home_for_role())
+
+    extension = original_filename.rsplit(".", 1)[1].lower()
+
+    if not image_signature_is_valid(evidence_file, extension):
+        flash(
+            "The uploaded file does not appear to be a valid supported image.",
+            "error"
+        )
+        return redirect(home_for_role())
+
     with get_db() as db:
         donation = get_donation(db, donation_id)
         ensure_matched_ngo(donation)
@@ -881,6 +967,7 @@ def collect_pickup(donation_id):
             not allowed
             or pickup["status"] != "READY_FOR_COLLECTION"
             or donation["status"] != "NGO_ACCEPTED"
+            or not pickup["location_confirmed"]
         ):
             flash(
                 "Pickup is blocked. Ensure NGO acceptance and location confirmation.",
@@ -888,22 +975,108 @@ def collect_pickup(donation_id):
             )
             return redirect(home_for_role())
 
-        db.execute(
-            "UPDATE pickups SET status = ? WHERE donation_id = ?",
-            ("COLLECTED", donation_id)
-        )
-        db.execute(
-            "UPDATE donations SET status = ? WHERE id = ?",
-            ("COLLECTED", donation_id)
-        )
+        # Generate a server-side filename; never trust the submitted name.
+        stored_filename = f"{uuid.uuid4().hex}.{extension}"
+        UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+        stored_path = UPLOAD_FOLDER / stored_filename
 
-        log_event(
-            db, donation_id, "COLLECTED",
-            f"Collection recorded by matched NGO {session['username']}."
-        )
+        try:
+            evidence_file.save(str(stored_path))
+            collected_at = utc_now()
+            collected_by = session["username"]
 
-    flash("Pickup marked as collected.", "success")
+            db.execute(
+                """
+                UPDATE pickups
+                SET status = ?,
+                    evidence_filename = ?,
+                    collected_at = ?,
+                    collected_by = ?,
+                    collection_notes = ?
+                WHERE donation_id = ?
+                """,
+                (
+                    "COLLECTED",
+                    stored_filename,
+                    collected_at,
+                    collected_by,
+                    notes or None,
+                    donation_id
+                )
+            )
+
+            db.execute(
+                "UPDATE donations SET status = ? WHERE id = ?",
+                ("COLLECTED", donation_id)
+            )
+
+            log_event(
+                db, donation_id, "COLLECTED",
+                f"Collection recorded by matched NGO {collected_by}; "
+                f"evidence photo uploaded at {collected_at}."
+            )
+
+            if notes:
+                log_event(
+                    db, donation_id, "COLLECTION_NOTES",
+                    f"NGO collection note: {notes}"
+                )
+
+        except Exception:
+            # Avoid leaving an orphaned image if the database update fails.
+            if stored_path.exists():
+                stored_path.unlink()
+            raise
+
+    flash(
+        "Pickup marked as collected. Evidence photo and collection details saved.",
+        "success"
+    )
     return redirect(home_for_role())
+
+
+@app.route("/pickup/<int:donation_id>/evidence")
+@login_required
+def view_pickup_evidence(donation_id):
+    with get_db() as db:
+        donation = get_donation(db, donation_id)
+
+        role = session.get("role")
+
+        if role == "restaurant":
+            ensure_restaurant_owns(donation)
+        elif role == "ngo":
+            ensure_matched_ngo(donation)
+        elif role != "reviewer":
+            abort(403)
+
+        pickup = db.execute(
+            """
+            SELECT evidence_filename
+            FROM pickups
+            WHERE donation_id = ?
+            """,
+            (donation_id,)
+        ).fetchone()
+
+        if pickup is None or not pickup["evidence_filename"]:
+            abort(404)
+
+        filename = pickup["evidence_filename"]
+
+    response = send_from_directory(
+        app.config["UPLOAD_FOLDER"],
+        filename,
+        mimetype="image/jpeg" if filename.lower().endswith((".jpg", ".jpeg"))
+        else (
+            "image/png" if filename.lower().endswith(".png")
+            else "image/webp"
+        ),
+        as_attachment=False
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 
 @app.route("/tests")
@@ -961,9 +1134,16 @@ def not_found(_error):
     return "Page not found.", 404
 
 
+@app.errorhandler(413)
+def upload_too_large(_error):
+    flash("Photo is too large. Maximum upload size is 5 MB.", "error")
+    return redirect(home_for_role())
+
+
 with app.app_context():
     init_db()
 
 
 if __name__ == "__main__":
     app.run(debug=True)
+```
