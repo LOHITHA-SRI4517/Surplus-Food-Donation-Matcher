@@ -1,4 +1,4 @@
-```python
+
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
@@ -333,4 +333,3 @@ if __name__ == "__main__":
     init_db()
     print("FoodBridge database initialized successfully.")
     print("Pickup evidence columns are ready.")
-```
