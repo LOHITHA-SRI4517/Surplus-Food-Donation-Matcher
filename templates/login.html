@@ -1,203 +1,203 @@
- {% extends "base.html" %}
 
-{% block title %}Login | FoodBridge{% endblock %}
+{% extends "base.html" %}
+
+{% block title %}Login | Surplus Donation{% endblock %}
 
 {% block content %}
 <style>
-    .login-container {
-        min-height: 80vh;
+    .login-page {
+        min-height: 75vh;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 35px 16px;
-        background: linear-gradient(135deg, #f0fdf4, #f8fafc, #ecfdf5);
+        background: #f4faf5;
     }
 
     .login-card {
         width: 100%;
-        max-width: 440px;
-        padding: 36px 32px 26px;
+        max-width: 430px;
+        box-sizing: border-box;
         background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 22px;
-        box-shadow: 0 18px 45px rgba(22, 101, 52, 0.10);
+        padding: 32px;
+        border-radius: 20px;
+        border: 1px solid #e0ebe3;
+        box-shadow: 0 12px 35px rgba(18, 61, 43, 0.09);
     }
 
-    .login-card .eyebrow {
-        display: inline-block;
-        margin: 0 0 12px;
-        padding: 7px 12px;
-        border-radius: 30px;
-        background: #dcfce7;
-        color: #166534;
-        font-size: 11px;
+    .login-eyebrow {
+        color: #176b45;
+        font-size: 12px;
         font-weight: 800;
-        letter-spacing: 1.5px;
+        letter-spacing: 2px;
+        margin: 0 0 10px;
     }
 
     .login-card h1 {
+        color: #123d2b;
+        font-size: 29px;
         margin: 0 0 10px;
-        color: #14532d;
-        font-size: 32px;
-        font-weight: 800;
     }
 
-    .login-card > p:not(.eyebrow):not(.login-tagline) {
-        margin: 0 0 25px;
-        color: #64748b;
+    .login-description {
+        color: #64756a;
+        line-height: 1.6;
         font-size: 14px;
-        line-height: 1.7;
+        margin: 0 0 24px;
     }
 
-    .login-card .form-group {
+    .login-field {
         margin-bottom: 18px;
     }
 
-    .login-card label {
+    .login-field label {
         display: block;
-        margin-bottom: 8px;
-        color: #334155;
-        font-size: 13px;
+        color: #234634;
         font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 8px;
     }
 
-    .login-card input,
-    .login-card select {
+    .login-field input,
+    .login-field select {
         width: 100%;
         min-height: 46px;
+        box-sizing: border-box;
         padding: 12px 13px;
-        border: 1px solid #d1d5db;
+        border: 1px solid #d5e2d8;
         border-radius: 10px;
-        background: #ffffff;
-        color: #1f2937;
-        font-size: 14px;
-        outline: none;
-        transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    .login-card input:focus,
-    .login-card select:focus {
-        border-color: #16a34a;
-        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
-    }
-
-    .login-card .login-button {
-        width: 100%;
-        min-height: 48px;
-        margin-top: 5px;
-        border: none;
-        border-radius: 10px;
-        background: #15803d;
-        color: #ffffff;
+        background: #fff;
+        color: #173d2c;
         font-size: 15px;
+        outline: none;
+    }
+
+    .login-field input:focus,
+    .login-field select:focus {
+        border-color: #176b45;
+        box-shadow: 0 0 0 3px rgba(23, 107, 69, 0.10);
+    }
+
+    .password-wrap {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .password-wrap input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .toggle-password {
+        min-width: 76px;
+        padding: 0 10px;
+        border: 1px solid #cbded0;
+        border-radius: 10px;
+        background: #f3f8f4;
+        color: #176b45;
         font-weight: 700;
         cursor: pointer;
-        transition: background 0.2s, transform 0.2s;
     }
 
-    .login-card .login-button:hover {
-        background: #166534;
-        transform: translateY(-1px);
+    .toggle-password:hover {
+        background: #e5f1e8;
     }
 
-    .login-card .alert {
-        margin-bottom: 16px;
+    .login-submit {
+        width: 100%;
+        min-height: 48px;
+        border: 0;
+        border-radius: 11px;
+        background: #176b45;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 800;
+        cursor: pointer;
+        margin-top: 5px;
+    }
+
+    .login-submit:hover {
+        background: #123d2b;
+    }
+
+    .login-alert {
         padding: 12px 14px;
-        border-radius: 9px;
-        font-size: 13px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        font-size: 14px;
         line-height: 1.5;
     }
 
-    .login-card .alert.error {
-        background: #fef2f2;
-        border: 1px solid #fecaca;
-        color: #b91c1c;
+    .login-alert.error {
+        background: #fff0ef;
+        color: #a12622;
+        border: 1px solid #f2ceca;
     }
 
-    .login-card .alert.success {
-        background: #f0fdf4;
-        border: 1px solid #bbf7d0;
-        color: #166534;
+    .login-alert.success {
+        background: #edf9f0;
+        color: #176b45;
+        border: 1px solid #cce8d3;
+    }
+
+    .login-alert.warning {
+        background: #fff8e7;
+        color: #855c09;
+        border: 1px solid #f0dfae;
+    }
+
+    .login-signup {
+        text-align: center;
+        margin-top: 22px;
+        color: #65766b;
+        font-size: 14px;
+    }
+
+    .login-signup a {
+        color: #176b45;
+        font-weight: 800;
+        text-decoration: none;
+    }
+
+    .login-signup a:hover {
+        text-decoration: underline;
     }
 
     .login-footer {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 24px;
-        padding: 17px 10px;
-        border-top: 1px solid #e5e7eb;
-        color: #64748b;
-        font-size: 13px;
-    }
-
-    .signup-small-btn {
-        display: inline-block;
-        padding: 9px 14px;
-        border: 1px solid #bbf7d0;
-        border-radius: 8px;
-        background: #f0fdf4;
-        color: #15803d;
-        font-weight: 700;
-        text-decoration: none;
-        transition: background 0.2s;
-    }
-
-    .signup-small-btn:hover {
-        background: #dcfce7;
-    }
-
-    .login-tagline {
-        margin: 4px 0 0;
-        padding-top: 16px;
         text-align: center;
-        border-top: 1px solid #f1f5f9;
-    }
-
-    .login-tagline .tagline-icon {
-        display: block;
-        margin-bottom: 7px;
-        font-size: 23px;
-    }
-
-    .login-tagline strong {
-        display: block;
-        margin-bottom: 6px;
-        color: #166534;
-        font-size: 17px;
-    }
-
-    .login-tagline small {
-        display: block;
-        color: #64748b;
-        font-size: 12px;
-        line-height: 1.6;
+        margin-top: 23px;
+        color: #176b45;
+        font-size: 13px;
+        line-height: 1.7;
     }
 
     @media (max-width: 480px) {
         .login-card {
-            padding: 28px 21px 22px;
+            padding: 24px 19px;
         }
 
         .login-card h1 {
-            font-size: 28px;
+            font-size: 25px;
         }
     }
 </style>
 
-<section class="login-container">
+<section class="login-page">
     <div class="login-card">
-        <p class="eyebrow">FOODBRIDGE · SURPLUS DONATION</p>
+
+        <p class="login-eyebrow">SURPLUS DONATION · ACCOUNT ACCESS</p>
 
         <h1>Welcome Back! 👋</h1>
-        <p>Sign in to connect surplus food with people who need it.</p>
+
+        <p class="login-description">
+            Sign in to connect surplus food with people who need it.
+        </p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert {{ category }}" role="alert">
+                    <div class="login-alert {{ category }}">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -205,17 +205,20 @@
         {% endwith %}
 
         <form method="POST" action="{{ url_for('login') }}">
-            <div class="form-group">
+
+            <div class="login-field">
                 <label for="role">Login As</label>
                 <select id="role" name="role" required>
-                    <option value="">Select your role</option>
+                    <option value="" disabled selected>
+                        Select your role
+                    </option>
                     <option value="restaurant">Restaurant</option>
                     <option value="ngo">NGO</option>
                     <option value="reviewer">Reviewer</option>
                 </select>
             </div>
 
-            <div class="form-group">
+            <div class="login-field">
                 <label for="username">Username</label>
                 <input
                     type="text"
@@ -223,39 +226,67 @@
                     name="username"
                     placeholder="Enter your username"
                     autocomplete="username"
+                    minlength="4"
+                    maxlength="50"
                     required
                 >
             </div>
 
-            <div class="form-group">
+            <div class="login-field">
                 <label for="password">Password</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    placeholder="Enter your password"
-                    autocomplete="current-password"
-                    required
-                >
+
+                <div class="password-wrap">
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                        required
+                    >
+
+                    <button
+                        type="button"
+                        class="toggle-password"
+                        id="togglePassword"
+                        aria-controls="password"
+                        aria-pressed="false"
+                    >👁️ Show</button>
+                </div>
             </div>
 
-            <button type="submit" class="btn btn-primary login-button">
+            <button type="submit" class="login-submit">
                 Login Securely →
             </button>
+
         </form>
 
-        <div class="login-footer">
-            <span>New to FoodBridge?</span>
-            <a class="signup-small-btn" href="{{ url_for('signup') }}">
-                Create Account →
-            </a>
+        <div class="login-signup">
+            New to Surplus Donation?
+            <a href="{{ url_for('signup') }}">Create Account →</a>
         </div>
 
-        <div class="login-tagline">
-            <span class="tagline-icon">💚</span>
-            <strong>Good Food. Better Tomorrow.</strong>
-            <small>Every meal saved brings us one step closer to a hunger-free world.</small>
+        <div class="login-footer">
+            💚 <strong>Good Food. Better Tomorrow.</strong>
+            <br>
+            Every meal saved brings us closer to a hunger-free world.
         </div>
+
     </div>
 </section>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const passwordInput = document.getElementById("password");
+        const toggleButton = document.getElementById("togglePassword");
+
+        toggleButton.addEventListener("click", function () {
+            const shouldShow = passwordInput.type === "password";
+
+            passwordInput.type = shouldShow ? "text" : "password";
+            toggleButton.textContent = shouldShow ? "🙈 Hide" : "👁️ Show";
+            toggleButton.setAttribute("aria-pressed", String(shouldShow));
+        });
+    });
+</script>
 {% endblock %}
