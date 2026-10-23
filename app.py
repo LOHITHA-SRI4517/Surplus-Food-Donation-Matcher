@@ -1,3 +1,4 @@
+```python
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import os
@@ -23,7 +24,6 @@ app.secret_key = os.environ.get(
     "foodbridge-local-demo-key-change-before-deployment"
 )
 
-# Upload evidence outside the static website directory.
 UPLOAD_FOLDER = Path(app.root_path) / "pickup_evidence"
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -253,10 +253,6 @@ def allowed_evidence_extension(filename):
 
 
 def image_signature_is_valid(file_storage, extension):
-    """
-    Check common image file signatures rather than trusting
-    only the filename or browser-supplied MIME type.
-    """
     file_storage.stream.seek(0)
     header = file_storage.stream.read(16)
     file_storage.stream.seek(0)
@@ -299,28 +295,59 @@ def signup():
         categories = request.form.get("categories", "").strip()
         capacity_text = request.form.get("capacity", "").strip()
 
-        if role not in ("restaurant", "ngo"):
-            flash("Choose Restaurant or NGO.", "error")
-            return redirect(url_for("signup"))
+        reviewer_code = request.form.get("reviewer_code", "").strip()
+        expected_reviewer_code = os.environ.get(
+            "REVIEWER_SIGNUP_CODE", ""
+        )
 
-        if not all([username, password, organization_name, city]):
-            flash("Please complete all required fields.", "error")
+        if role not in VALID_ROLES:
+            flash("Please select a valid account type.", "error")
             return redirect(url_for("signup"))
 
         if len(username) < 4 or len(username) > 50:
-            flash("Username must contain 4 to 50 characters.", "error")
+            flash(
+                "Username must contain 4 to 50 characters.",
+                "error"
+            )
             return redirect(url_for("signup"))
 
         if len(password) < 8:
-            flash("Password must contain at least 8 characters.", "error")
+            flash(
+                "Password must contain at least 8 characters.",
+                "error"
+            )
             return redirect(url_for("signup"))
+
+        if role == "reviewer":
+            if not expected_reviewer_code:
+                flash(
+                    "Reviewer registration is not configured. "
+                    "Please contact the project administrator.",
+                    "error"
+                )
+                return redirect(url_for("signup"))
+
+            if (
+                not reviewer_code
+                or reviewer_code != expected_reviewer_code
+            ):
+                flash("Invalid reviewer registration code.", "error")
+                return redirect(url_for("signup"))
+
+        else:
+            if not all([organization_name, city]):
+                flash(
+                    "Please enter your organization name and city.",
+                    "error"
+                )
+                return redirect(url_for("signup"))
 
         capacity = None
 
         if role == "ngo":
             if not categories or not capacity_text:
                 flash(
-                    "NGO category and capacity are required.",
+                    "NGO food categories and capacity are required.",
                     "error"
                 )
                 return redirect(url_for("signup"))
@@ -330,7 +357,10 @@ def signup():
                 if capacity <= 0:
                     raise ValueError
             except ValueError:
-                flash("Capacity must be a positive number.", "error")
+                flash(
+                    "Capacity must be a positive whole number.",
+                    "error"
+                )
                 return redirect(url_for("signup"))
 
         try:
@@ -356,7 +386,8 @@ def signup():
                         """,
                         (username, password_hash, organization_name)
                     )
-                else:
+
+                elif role == "ngo":
                     ngo_code = "NGO-" + username
 
                     db.execute(
@@ -366,8 +397,11 @@ def signup():
                         VALUES (?, ?, ?, ?, ?, 1)
                         """,
                         (
-                            ngo_code, organization_name, city,
-                            categories, capacity
+                            ngo_code,
+                            organization_name,
+                            city,
+                            categories,
+                            capacity
                         )
                     )
 
@@ -386,14 +420,29 @@ def signup():
                         (username, password_hash, ngo["id"])
                     )
 
+                elif role == "reviewer":
+                    db.execute(
+                        """
+                        INSERT INTO users
+                            (username, password_hash, role,
+                             restaurant_name, ngo_id)
+                        VALUES (?, ?, 'reviewer', NULL, NULL)
+                        """,
+                        (username, password_hash)
+                    )
+
         except sqlite3.IntegrityError:
             flash(
-                "Username or NGO code already exists. Please try another username.",
+                "Username or NGO code already exists. "
+                "Please try another username.",
                 "error"
             )
             return redirect(url_for("signup"))
 
-        flash("Account created successfully! Please log in.", "success")
+        flash(
+            "Account created successfully! Please log in.",
+            "success"
+        )
         return redirect(url_for("login"))
 
     return render_template("signup.html")
@@ -434,7 +483,10 @@ def login():
             flash("Login successful!", "success")
             return redirect(home_for_role(user["role"]))
 
-        flash("Invalid username, password, or selected role.", "error")
+        flash(
+            "Invalid username, password, or selected role.",
+            "error"
+        )
 
     return render_template("login.html")
 
@@ -974,7 +1026,6 @@ def collect_pickup(donation_id):
             )
             return redirect(home_for_role())
 
-        # Generate a server-side filename; never trust the submitted name.
         stored_filename = f"{uuid.uuid4().hex}.{extension}"
         UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
         stored_path = UPLOAD_FOLDER / stored_filename
@@ -1022,7 +1073,6 @@ def collect_pickup(donation_id):
                 )
 
         except Exception:
-            # Avoid leaving an orphaned image if the database update fails.
             if stored_path.exists():
                 stored_path.unlink()
             raise
@@ -1039,7 +1089,6 @@ def collect_pickup(donation_id):
 def view_pickup_evidence(donation_id):
     with get_db() as db:
         donation = get_donation(db, donation_id)
-
         role = session.get("role")
 
         if role == "restaurant":
@@ -1063,14 +1112,17 @@ def view_pickup_evidence(donation_id):
 
         filename = pickup["evidence_filename"]
 
+    if filename.lower().endswith((".jpg", ".jpeg")):
+        mimetype = "image/jpeg"
+    elif filename.lower().endswith(".png"):
+        mimetype = "image/png"
+    else:
+        mimetype = "image/webp"
+
     response = send_from_directory(
         app.config["UPLOAD_FOLDER"],
         filename,
-        mimetype="image/jpeg" if filename.lower().endswith((".jpg", ".jpeg"))
-        else (
-            "image/png" if filename.lower().endswith(".png")
-            else "image/webp"
-        ),
+        mimetype=mimetype,
         as_attachment=False
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -1145,3 +1197,4 @@ with app.app_context():
 
 if __name__ == "__main__":
     app.run(debug=True)
+```
