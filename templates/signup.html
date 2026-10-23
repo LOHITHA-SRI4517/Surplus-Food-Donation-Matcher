@@ -1,3 +1,4 @@
+```html
 {% extends "base.html" %}
 
 {% block title %}Sign Up | FoodBridge AI{% endblock %}
@@ -113,16 +114,21 @@
                         Reviewer Registration Code
                     </label>
                     <input
-                        type="password"
+                        type="text"
                         id="reviewer_code"
                         name="reviewer_code"
                         autocomplete="off"
-                        placeholder="Enter authorized reviewer code"
+                        placeholder="Enter reviewer code"
                     >
                 </div>
 
+                <p class="reviewer-demo-code">
+                    <strong>Demo Reviewer Code:</strong>
+                    FoodBridgeReview2026!
+                </p>
+
                 <p>
-                    Reviewer accounts require an authorized registration code.
+                    Use this code to register a reviewer account for the demo.
                 </p>
             </div>
 
@@ -203,3 +209,4 @@
     updateSignupForm();
 </script>
 {% endblock %}
+```
