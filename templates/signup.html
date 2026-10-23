@@ -1,14 +1,14 @@
-
+```html
 {% extends "base.html" %}
 
-{% block title %}Sign Up | Surplus Donation{% endblock %}
+{% block title %}Sign Up | FoodBridge AI{% endblock %}
 
 {% block content %}
 <section class="login-container">
     <div class="login-card">
-        <p class="eyebrow">JOIN SURPLUS DONATION</p>
+        <p class="eyebrow">JOIN FOODBRIDGE AI</p>
         <h1>Create Account</h1>
-        <p>Register your restaurant or NGO to get started.</p>
+        <p>Register your restaurant, NGO, or reviewer account.</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -21,12 +21,14 @@
         {% endwith %}
 
         <form method="POST" action="{{ url_for('signup') }}" id="signupForm">
+
             <div class="form-group">
                 <label for="role">Register As</label>
                 <select id="role" name="role" required>
                     <option value="">Select account type</option>
                     <option value="restaurant">Restaurant</option>
                     <option value="ngo">NGO</option>
+                    <option value="reviewer">Reviewer</option>
                 </select>
             </div>
 
@@ -44,7 +46,7 @@
                 >
             </div>
 
-            <div class="form-group">
+            <div class="form-group" id="organizationGroup">
                 <label for="organization_name" id="organizationLabel">
                     Restaurant / NGO Name
                 </label>
@@ -53,7 +55,7 @@
                     id="organization_name"
                     name="organization_name"
                     maxlength="100"
-                    placeholder="Enter restaurant or NGO name"
+                    placeholder="Enter organization name"
                     required
                 >
             </div>
@@ -71,7 +73,7 @@
                 >
             </div>
 
-            <div class="form-group">
+            <div class="form-group" id="cityGroup">
                 <label for="city">City</label>
                 <input
                     type="text"
@@ -107,6 +109,13 @@
                 </div>
             </div>
 
+            <div id="reviewerFields" hidden>
+                <p>
+                    Reviewer accounts are intended for authorized project
+                    reviewers who verify donations and approve requests.
+                </p>
+            </div>
+
             <button type="submit" class="btn btn-primary" id="signupButton">
                 Create Account
             </button>
@@ -122,16 +131,35 @@
 <script>
     const roleSelect = document.getElementById("role");
     const ngoFields = document.getElementById("ngoFields");
+    const reviewerFields = document.getElementById("reviewerFields");
+
     const categoriesInput = document.getElementById("categories");
     const capacityInput = document.getElementById("capacity");
+
+    const organizationGroup = document.getElementById("organizationGroup");
     const organizationLabel = document.getElementById("organizationLabel");
     const organizationInput = document.getElementById("organization_name");
+
+    const cityGroup = document.getElementById("cityGroup");
+    const cityInput = document.getElementById("city");
+
     const signupButton = document.getElementById("signupButton");
 
     function updateSignupForm() {
-        const isNgo = roleSelect.value === "ngo";
+        const role = roleSelect.value;
+        const isNgo = role === "ngo";
+        const isReviewer = role === "reviewer";
+        const isRestaurant = role === "restaurant";
 
         ngoFields.hidden = !isNgo;
+        reviewerFields.hidden = !isReviewer;
+
+        organizationGroup.hidden = isReviewer;
+        cityGroup.hidden = isReviewer;
+
+        organizationInput.required = !isReviewer;
+        cityInput.required = !isReviewer;
+
         categoriesInput.required = isNgo;
         capacityInput.required = isNgo;
 
@@ -143,12 +171,19 @@
             ? "Enter your NGO name"
             : "Enter your restaurant name";
 
-        signupButton.textContent = isNgo
-            ? "Register NGO"
-            : "Create Account";
+        if (isNgo) {
+            signupButton.textContent = "Register NGO";
+        } else if (isReviewer) {
+            signupButton.textContent = "Create Reviewer Account";
+        } else if (isRestaurant) {
+            signupButton.textContent = "Register Restaurant";
+        } else {
+            signupButton.textContent = "Create Account";
+        }
     }
 
     roleSelect.addEventListener("change", updateSignupForm);
     updateSignupForm();
 </script>
 {% endblock %}
+```
