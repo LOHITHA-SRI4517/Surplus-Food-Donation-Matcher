@@ -1,4 +1,3 @@
-```html
 {% extends "base.html" %}
 
 {% block title %}Sign Up | FoodBridge AI{% endblock %}
@@ -21,7 +20,6 @@
         {% endwith %}
 
         <form method="POST" action="{{ url_for('signup') }}" id="signupForm">
-
             <div class="form-group">
                 <label for="role">Register As</label>
                 <select id="role" name="role" required>
@@ -109,7 +107,6 @@
                 </div>
             </div>
 
-            <!-- Reviewer registration code -->
             <div id="reviewerFields" hidden>
                 <div class="form-group">
                     <label for="reviewer_code">
@@ -206,4 +203,3 @@
     updateSignupForm();
 </script>
 {% endblock %}
-```
