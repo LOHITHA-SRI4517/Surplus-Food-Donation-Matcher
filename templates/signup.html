@@ -1,4 +1,4 @@
-
+```html
 {% extends "base.html" %}
 
 {% block title %}Sign Up | FoodBridge AI{% endblock %}
@@ -109,14 +109,31 @@
                 </div>
             </div>
 
+            <!-- Reviewer registration code -->
             <div id="reviewerFields" hidden>
+                <div class="form-group">
+                    <label for="reviewer_code">
+                        Reviewer Registration Code
+                    </label>
+                    <input
+                        type="password"
+                        id="reviewer_code"
+                        name="reviewer_code"
+                        autocomplete="off"
+                        placeholder="Enter authorized reviewer code"
+                    >
+                </div>
+
                 <p>
-                    Reviewer accounts are intended for authorized project
-                    reviewers who verify donations and approve requests.
+                    Reviewer accounts require an authorized registration code.
                 </p>
             </div>
 
-            <button type="submit" class="btn btn-primary" id="signupButton">
+            <button
+                type="submit"
+                class="btn btn-primary"
+                id="signupButton"
+            >
                 Create Account
             </button>
         </form>
@@ -132,6 +149,7 @@
     const roleSelect = document.getElementById("role");
     const ngoFields = document.getElementById("ngoFields");
     const reviewerFields = document.getElementById("reviewerFields");
+    const reviewerCodeInput = document.getElementById("reviewer_code");
 
     const categoriesInput = document.getElementById("categories");
     const capacityInput = document.getElementById("capacity");
@@ -153,6 +171,8 @@
 
         ngoFields.hidden = !isNgo;
         reviewerFields.hidden = !isReviewer;
+
+        reviewerCodeInput.required = isReviewer;
 
         organizationGroup.hidden = isReviewer;
         cityGroup.hidden = isReviewer;
@@ -186,3 +206,4 @@
     updateSignupForm();
 </script>
 {% endblock %}
+```
