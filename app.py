@@ -806,15 +806,22 @@ def ngo_action(donation_id, action):
                         utc_now()
                     )
                 )
-            elif pickup["location_confirmed"]:
-                db.execute(
-                    "UPDATE pickups SET status = ? WHERE donation_id = ?",
-                    ("READY_FOR_COLLECTION", donation_id)
-                )
             else:
+                # A previously confirmed address is no longer trusted
+                # automatically; NGO must check the currently displayed address.
                 db.execute(
-                    "UPDATE pickups SET status = ? WHERE donation_id = ?",
-                    ("BLOCKED_LOCATION_RECONFIRMATION", donation_id)
+                    """
+                    UPDATE pickups
+                    SET location = ?,
+                        location_confirmed = 0,
+                        status = ?
+                    WHERE donation_id = ?
+                    """,
+                    (
+                        donation["dropoff_location"],
+                        "BLOCKED_LOCATION_RECONFIRMATION",
+                        donation_id
+                    )
                 )
 
             log_event(
@@ -823,10 +830,10 @@ def ngo_action(donation_id, action):
             )
             log_event(
                 db, donation_id, "PICKUP_STATUS_UPDATED",
-                "Pickup readiness depends on location confirmation."
+                "Pickup is blocked until the displayed location is confirmed."
             )
             flash(
-                "Donation accepted. Confirm the pickup location before collection.",
+                "Donation accepted. Check the displayed address and confirm it before collection.",
                 "success"
             )
 
@@ -900,11 +907,20 @@ def confirm_location(donation_id):
         donation = get_donation(db, donation_id)
         ensure_matched_ngo(donation)
 
-        if donation["status"] not in (
-            "NGO_ACCEPTED", "AWAITING_NGO_ACCEPTANCE"
-        ):
+        # NGO must accept the donation first.
+        if donation["status"] != "NGO_ACCEPTED":
             flash(
-                "Location cannot be confirmed at this stage.",
+                "Accept the donation before confirming its pickup location.",
+                "error"
+            )
+            return redirect(home_for_role())
+
+        # The restaurant must provide a non-empty address.
+        location = (donation["dropoff_location"] or "").strip()
+
+        if not location:
+            flash(
+                "Pickup location is missing. Ask the restaurant to provide it.",
                 "error"
             )
             return redirect(home_for_role())
@@ -914,44 +930,35 @@ def confirm_location(donation_id):
             (donation_id,)
         ).fetchone()
 
-        new_status = (
-            "READY_FOR_COLLECTION"
-            if donation["status"] == "NGO_ACCEPTED"
-            else "NGO_PENDING"
-        )
-
         if pickup is None:
-            db.execute(
-                """
-                INSERT INTO pickups
-                    (donation_id, status, location, location_confirmed, created_at)
-                VALUES (?, ?, ?, 1, ?)
-                """,
-                (
-                    donation_id, new_status,
-                    donation["dropoff_location"], utc_now()
-                )
+            flash(
+                "Pickup record is missing. Please contact the administrator.",
+                "error"
             )
-        else:
-            db.execute(
-                """
-                UPDATE pickups
-                SET location = ?, location_confirmed = 1, status = ?
-                WHERE donation_id = ?
-                """,
-                (
-                    donation["dropoff_location"],
-                    new_status,
-                    donation_id
-                )
-            )
+            return redirect(home_for_role())
+
+        db.execute(
+            """
+            UPDATE pickups
+            SET location = ?,
+                location_confirmed = 1,
+                status = ?
+            WHERE donation_id = ?
+            """,
+            (location, "READY_FOR_COLLECTION", donation_id)
+        )
 
         log_event(
-            db, donation_id, "LOCATION_CONFIRMED",
-            f"Pickup location confirmed by matched NGO {session['username']}."
+            db,
+            donation_id,
+            "LOCATION_CONFIRMED",
+            f"Pickup address confirmed by matched NGO {session['username']}."
         )
 
-    flash("Pickup location confirmed.", "success")
+    flash(
+        "Location confirmed. Pickup is ready for collection.",
+        "success"
+    )
     return redirect(home_for_role())
 
 
