@@ -180,6 +180,7 @@
                     <td>
                         <div class="action-row">
 
+                            {# Reviewer: initial donation approval #}
                             {% if session.get('role') == 'reviewer'
                                 and donation.status == 'AWAITING_HUMAN_APPROVAL' %}
                             <form method="POST"
@@ -189,6 +190,7 @@
                             </form>
                             {% endif %}
 
+                            {# NGO: accept or reject donation #}
                             {% if session.get('role') == 'ngo'
                                 and donation.status == 'AWAITING_NGO_ACCEPTANCE' %}
                             <form method="POST"
@@ -204,8 +206,9 @@
                             </form>
                             {% endif %}
 
+                            {# NGO: confirm or reconfirm pickup location #}
                             {% if session.get('role') == 'ngo'
-                                and donation.status == 'NGO_ACCEPTED'
+                                and donation.status in ['NGO_ACCEPTED', 'BLOCKED_LOCATION_RECONFIRMATION']
                                 and not donation.location_confirmed %}
                                 {% if donation.dropoff_location %}
                                 <form method="POST"
@@ -220,6 +223,7 @@
                                 {% endif %}
                             {% endif %}
 
+                            {# NGO: upload pickup evidence after location confirmation #}
                             {% if session.get('role') == 'ngo'
                                 and donation.status == 'NGO_ACCEPTED'
                                 and donation.location_confirmed %}
@@ -253,6 +257,7 @@
                             </form>
                             {% endif %}
 
+                            {# Reviewer: inspect and verify uploaded evidence #}
                             {% if session.get('role') == 'reviewer'
                                 and donation.status == 'AWAITING_PICKUP_VERIFICATION' %}
                             <div>
@@ -310,6 +315,7 @@
                             </div>
                             {% endif %}
 
+                            {# Restaurant: pending pickup verification #}
                             {% if session.get('role') == 'restaurant'
                                 and donation.status == 'AWAITING_PICKUP_VERIFICATION' %}
                             <span class="muted">
@@ -323,6 +329,7 @@
                             </span>
                             {% endif %}
 
+                            {# Restaurant: update pickup location #}
                             {% if session.get('role') == 'restaurant'
                                 and donation.status not in [
                                     'COLLECTED',
