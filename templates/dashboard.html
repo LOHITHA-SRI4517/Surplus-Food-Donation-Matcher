@@ -59,7 +59,8 @@
             <select id="ngo_id" name="ngo_id" required>
                 <option value="">Choose a registered NGO</option>
                 {% for ngo in ngos %}
-                <option value="{{ ngo.id }}">
+                <option value="{{ ngo.id }}"
+                        {% if not ngo.available %}disabled{% endif %}>
                     {{ ngo.name }} — {{ ngo.city }}
                     {% if not ngo.available %}(Unavailable){% endif %}
                 </option>
@@ -109,7 +110,7 @@
 
 {% if session.get('role') == 'reviewer' %}
 <section class="panel">
-    <h2>Human Review & Pickup Verification</h2>
+    <h2>Human Review &amp; Pickup Verification</h2>
     <p>
         Review donations before NGO acceptance. After collection evidence
         is uploaded, inspect the photo and approve or reject verification.
@@ -179,7 +180,6 @@
                     <td>
                         <div class="action-row">
 
-                            {# Reviewer: initial donation approval #}
                             {% if session.get('role') == 'reviewer'
                                 and donation.status == 'AWAITING_HUMAN_APPROVAL' %}
                             <form method="POST"
@@ -189,7 +189,6 @@
                             </form>
                             {% endif %}
 
-                            {# NGO: accept or reject donation #}
                             {% if session.get('role') == 'ngo'
                                 and donation.status == 'AWAITING_NGO_ACCEPTANCE' %}
                             <form method="POST"
@@ -197,6 +196,7 @@
                                   data-confirm="Accept this donation after checking the address?">
                                 <button type="submit">Accept</button>
                             </form>
+
                             <form method="POST"
                                   action="{{ url_for('ngo_action', donation_id=donation.id, action='reject') }}"
                                   data-confirm="Reject this donation?">
@@ -204,23 +204,22 @@
                             </form>
                             {% endif %}
 
-                            {# NGO: confirm location #}
                             {% if session.get('role') == 'ngo'
-                                and donation.status == 'NGO_ACCEPTED' %}
-                            {% if donation.dropoff_location %}
-                            <form method="POST"
-                                  action="{{ url_for('confirm_location', donation_id=donation.id) }}"
-                                  data-confirm="Have you checked and confirmed this pickup address?">
-                                <button type="submit">Confirm Location</button>
-                            </form>
-                            {% else %}
-                            <span class="muted">
-                                Waiting for restaurant to provide the address.
-                            </span>
-                            {% endif %}
+                                and donation.status == 'NGO_ACCEPTED'
+                                and not donation.location_confirmed %}
+                                {% if donation.dropoff_location %}
+                                <form method="POST"
+                                      action="{{ url_for('confirm_location', donation_id=donation.id) }}"
+                                      data-confirm="Have you checked and confirmed this pickup address?">
+                                    <button type="submit">Confirm Location</button>
+                                </form>
+                                {% else %}
+                                <span class="muted">
+                                    Waiting for restaurant to provide the address.
+                                </span>
+                                {% endif %}
                             {% endif %}
 
-                            {# NGO: upload pickup evidence #}
                             {% if session.get('role') == 'ngo'
                                 and donation.status == 'NGO_ACCEPTED'
                                 and donation.location_confirmed %}
@@ -237,6 +236,7 @@
                                            accept=".jpg,.jpeg,.png,.webp"
                                            required>
                                 </div>
+
                                 <div class="form-group">
                                     <label for="notes-{{ donation.id }}">
                                         Collection notes
@@ -246,13 +246,13 @@
                                            name="evidence_notes"
                                            placeholder="Optional notes">
                                 </div>
+
                                 <button type="submit">
                                     Upload Evidence for Review
                                 </button>
                             </form>
                             {% endif %}
 
-                            {# Reviewer: inspect and verify uploaded evidence #}
                             {% if session.get('role') == 'reviewer'
                                 and donation.status == 'AWAITING_PICKUP_VERIFICATION' %}
                             <div>
@@ -260,11 +260,13 @@
 
                                 {% if donation.evidence_filename %}
                                 <p>
-                                    <a href="{{ url_for('uploaded_evidence', filename=donation.evidence_filename) }}"
+                                    <a href="{{ url_for('view_pickup_evidence', donation_id=donation.id) }}"
                                        target="_blank" rel="noopener">
                                         View evidence photo
                                     </a>
                                 </p>
+                                {% else %}
+                                <p class="muted">No evidence photo is available.</p>
                                 {% endif %}
 
                                 <form method="POST"
@@ -272,6 +274,7 @@
                                       data-confirm="Approve this evidence and mark the pickup completed?">
                                     <input type="hidden"
                                            name="decision" value="approve">
+
                                     <div class="form-group">
                                         <label for="approve-notes-{{ donation.id }}">
                                             Reviewer notes
@@ -280,7 +283,8 @@
                                                name="verification_notes"
                                                placeholder="Verification notes">
                                     </div>
-                                    <button type="submit">Verify & Approve</button>
+
+                                    <button type="submit">Verify &amp; Approve</button>
                                 </form>
 
                                 <form method="POST"
@@ -288,6 +292,7 @@
                                       data-confirm="Reject the evidence and request a new upload?">
                                     <input type="hidden"
                                            name="decision" value="reject">
+
                                     <div class="form-group">
                                         <label for="reject-notes-{{ donation.id }}">
                                             Reason for rejection
@@ -297,6 +302,7 @@
                                                placeholder="Explain why evidence is rejected"
                                                required>
                                     </div>
+
                                     <button type="submit" class="button-danger">
                                         Reject Evidence
                                     </button>
@@ -304,7 +310,6 @@
                             </div>
                             {% endif %}
 
-                            {# Restaurant: show pending verification #}
                             {% if session.get('role') == 'restaurant'
                                 and donation.status == 'AWAITING_PICKUP_VERIFICATION' %}
                             <span class="muted">
@@ -318,9 +323,13 @@
                             </span>
                             {% endif %}
 
-                            {# Restaurant: update location before collection #}
                             {% if session.get('role') == 'restaurant'
-                                and donation.status not in ['COLLECTED', 'NGO_REJECTED', 'SAFETY_REJECTED', 'AWAITING_PICKUP_VERIFICATION'] %}
+                                and donation.status not in [
+                                    'COLLECTED',
+                                    'NGO_REJECTED',
+                                    'SAFETY_REJECTED',
+                                    'AWAITING_PICKUP_VERIFICATION'
+                                ] %}
                             <form method="POST"
                                   action="{{ url_for('update_location', donation_id=donation.id) }}">
                                 <label for="location-{{ donation.id }}">
@@ -347,8 +356,13 @@
                             {% endif %}
 
                             {% if session.get('role') == 'reviewer'
-                                and donation.status not in ['AWAITING_HUMAN_APPROVAL', 'AWAITING_PICKUP_VERIFICATION'] %}
-                            <span class="muted">No review action currently required.</span>
+                                and donation.status not in [
+                                    'AWAITING_HUMAN_APPROVAL',
+                                    'AWAITING_PICKUP_VERIFICATION'
+                                ] %}
+                            <span class="muted">
+                                No review action currently required.
+                            </span>
                             {% endif %}
 
                         </div>
@@ -368,6 +382,7 @@
 
 <section class="panel">
     <h2>Recent Activity</h2>
+
     {% if recent_events %}
     <ul>
         {% for event in recent_events %}
