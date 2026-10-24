@@ -1,3 +1,4 @@
+
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import os
@@ -117,7 +118,9 @@ def get_visible_donations(db):
         p.evidence_filename AS evidence_filename,
         p.collected_at AS collected_at,
         p.collected_by AS collected_by,
-        p.collection_notes AS collection_notes
+        p.collection_notes AS collection_notes,
+        p.status AS pickup_status,
+        p.location_confirmed AS location_confirmed
     """
 
     if role == "restaurant":
@@ -195,7 +198,7 @@ def get_summary(db, donations):
         f"""
         SELECT COUNT(*) FROM pickups
         WHERE donation_id IN ({placeholders})
-        AND status = 'COLLECTED'
+        AND status = 'VERIFIED'
         """,
         donation_ids
     ).fetchone()[0]
@@ -853,7 +856,10 @@ def update_location(donation_id):
         ensure_restaurant_owns(donation)
 
         if donation["status"] in (
-            "COLLECTED", "NGO_REJECTED", "SAFETY_REJECTED"
+            "COLLECTED",
+            "NGO_REJECTED",
+            "SAFETY_REJECTED",
+            "AWAITING_PICKUP_VERIFICATION",
         ):
             flash(
                 "Location cannot be changed at this stage.",
@@ -1046,7 +1052,7 @@ def collect_pickup(donation_id):
                 WHERE donation_id = ?
                 """,
                 (
-                    "COLLECTED",
+                    "AWAITING_REVIEW",
                     stored_filename,
                     collected_at,
                     collected_by,
@@ -1057,13 +1063,15 @@ def collect_pickup(donation_id):
 
             db.execute(
                 "UPDATE donations SET status = ? WHERE id = ?",
-                ("COLLECTED", donation_id)
+                ("AWAITING_PICKUP_VERIFICATION", donation_id)
             )
 
             log_event(
-                db, donation_id, "COLLECTED",
-                f"Collection recorded by matched NGO {collected_by}; "
-                f"evidence photo uploaded at {collected_at}."
+                db,
+                donation_id,
+                "COLLECTION_SUBMITTED_FOR_REVIEW",
+                f"Collection evidence submitted by {collected_by} "
+                f"at {collected_at}. Awaiting reviewer verification."
             )
 
             if notes:
@@ -1078,9 +1086,114 @@ def collect_pickup(donation_id):
             raise
 
     flash(
-        "Pickup marked as collected. Evidence photo and collection details saved.",
+        "Collection evidence submitted. The reviewer must verify it before the donation is marked collected.",
         "success"
     )
+    return redirect(home_for_role())
+
+
+@app.route("/pickup/<int:donation_id>/verify", methods=["POST"])
+@role_required("reviewer")
+def verify_pickup(donation_id):
+    decision = request.form.get("decision", "").strip().lower()
+    notes = request.form.get("verification_notes", "").strip()
+
+    if decision not in ("approve", "reject"):
+        abort(400)
+
+    if len(notes) > 500:
+        flash("Verification notes must be 500 characters or fewer.", "error")
+        return redirect(home_for_role())
+
+    old_evidence_filename = None
+
+    with get_db() as db:
+        donation = get_donation(db, donation_id)
+
+        pickup = db.execute(
+            "SELECT * FROM pickups WHERE donation_id = ?",
+            (donation_id,)
+        ).fetchone()
+
+        if (
+            donation["status"] != "AWAITING_PICKUP_VERIFICATION"
+            or pickup is None
+            or pickup["status"] != "AWAITING_REVIEW"
+            or not pickup["evidence_filename"]
+        ):
+            flash(
+                "This pickup is not awaiting evidence verification.",
+                "error"
+            )
+            return redirect(home_for_role())
+
+        if decision == "approve":
+            db.execute(
+                "UPDATE pickups SET status = ? WHERE donation_id = ?",
+                ("VERIFIED", donation_id)
+            )
+
+            db.execute(
+                "UPDATE donations SET status = ? WHERE id = ?",
+                ("COLLECTED", donation_id)
+            )
+
+            log_event(
+                db,
+                donation_id,
+                "PICKUP_VERIFIED",
+                f"Pickup evidence approved by reviewer {session['username']}."
+                + (f" Notes: {notes}" if notes else ""),
+            )
+
+            flash(
+                "Pickup evidence verified. Donation marked collected.",
+                "success"
+            )
+
+        else:
+            old_evidence_filename = pickup["evidence_filename"]
+
+            db.execute(
+                """
+                UPDATE pickups
+                SET status = ?,
+                    evidence_filename = NULL,
+                    collected_at = NULL,
+                    collected_by = NULL,
+                    collection_notes = NULL
+                WHERE donation_id = ?
+                """,
+                ("READY_FOR_COLLECTION", donation_id)
+            )
+
+            db.execute(
+                "UPDATE donations SET status = ? WHERE id = ?",
+                ("NGO_ACCEPTED", donation_id)
+            )
+
+            log_event(
+                db,
+                donation_id,
+                "PICKUP_EVIDENCE_REJECTED",
+                f"Reviewer {session['username']} rejected the evidence."
+                + (f" Reason: {notes}" if notes else ""),
+            )
+
+            flash(
+                "Evidence rejected. The NGO can upload replacement evidence.",
+                "success"
+            )
+
+    # Remove rejected evidence only after its database reference is cleared.
+    if old_evidence_filename:
+        old_path = UPLOAD_FOLDER / old_evidence_filename
+        try:
+            if old_path.is_file():
+                old_path.unlink()
+        except OSError:
+            app.logger.exception("Could not delete rejected pickup evidence.")
+
     return redirect(home_for_role())
 
 
