@@ -104,7 +104,8 @@
             <input id="dropoff_location" name="dropoff_location"
                    placeholder="Enter complete pickup address" required>
             <small class="muted">
-                Enter the address where the NGO should collect the food.
+                Enter the complete address where the NGO should collect the food.
+                The matched NGO can view this address before confirming.
             </small>
         </div>
 
@@ -124,7 +125,8 @@
 <section class="panel">
     <h2>NGO Workspace</h2>
     <p>
-        Check the restaurant's pickup address before confirming its correctness.
+        Review the restaurant address, accept the donation, and confirm
+        the pickup location before collecting the food.
     </p>
 </section>
 {% endif %}
@@ -202,7 +204,7 @@
                                 and donation.status == 'AWAITING_NGO_ACCEPTANCE' %}
                             <form method="POST"
                                   action="{{ url_for('ngo_action', donation_id=donation.id, action='accept') }}"
-                                  data-confirm="Accept this donation?">
+                                  data-confirm="Accept this donation? Check the pickup address shown in the table first.">
                                 <button type="submit">Accept</button>
                             </form>
 
@@ -217,10 +219,11 @@
 
                             {% if session.get('role') == 'ngo'
                                 and donation.status == 'NGO_ACCEPTED' %}
+
                                 {% if donation.dropoff_location %}
                                 <form method="POST"
                                       action="{{ url_for('confirm_location', donation_id=donation.id) }}"
-                                      data-confirm="Have you checked this address with the restaurant and confirmed it is correct?">
+                                      data-confirm="Have you checked this displayed address and confirmed it is correct?">
                                     <button type="submit">Confirm Location</button>
                                 </form>
                                 {% else %}
@@ -229,11 +232,20 @@
                                 </span>
                                 {% endif %}
 
-                                <form method="POST"
-                                      action="{{ url_for('collect_pickup', donation_id=donation.id) }}"
-                                      data-confirm="Confirm only if the food has actually been collected.">
-                                    <button type="submit">Mark Collected</button>
-                                </form>
+                                {% if donation.status == 'NGO_ACCEPTED' %}
+                                    {% if donation.collected_at %}
+                                    <span class="muted">Pickup collected</span>
+                                    {% else %}
+                                    <span class="muted">
+                                        Confirm the location before collecting.
+                                    </span>
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+
+                            {% if session.get('role') == 'ngo'
+                                and donation.status == 'COLLECTED' %}
+                            <span class="muted">Collection completed</span>
                             {% endif %}
 
                             {% if session.get('role') == 'restaurant'
@@ -257,7 +269,7 @@
                             {% endif %}
 
                             {% if session.get('role') == 'ngo'
-                                and donation.status not in ['AWAITING_NGO_ACCEPTANCE', 'NGO_ACCEPTED'] %}
+                                and donation.status not in ['AWAITING_NGO_ACCEPTANCE', 'NGO_ACCEPTED', 'COLLECTED'] %}
                             <span class="muted">No action available</span>
                             {% endif %}
 
