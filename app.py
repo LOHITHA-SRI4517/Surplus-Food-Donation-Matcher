@@ -1,4 +1,3 @@
-
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import os
@@ -807,8 +806,6 @@ def ngo_action(donation_id, action):
                     )
                 )
             else:
-                # A previously confirmed address is no longer trusted
-                # automatically; NGO must check the currently displayed address.
                 db.execute(
                     """
                     UPDATE pickups
@@ -907,7 +904,6 @@ def confirm_location(donation_id):
         donation = get_donation(db, donation_id)
         ensure_matched_ngo(donation)
 
-        # NGO must accept the donation first.
         if donation["status"] != "NGO_ACCEPTED":
             flash(
                 "Accept the donation before confirming its pickup location.",
@@ -915,7 +911,6 @@ def confirm_location(donation_id):
             )
             return redirect(home_for_role())
 
-        # The restaurant must provide a non-empty address.
         location = (donation["dropoff_location"] or "").strip()
 
         if not location:
