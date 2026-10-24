@@ -1,199 +1,140 @@
 
 {% extends "base.html" %}
 
-{% block title %}Workflow Tests | FoodBridge AI{% endblock %}
-
 {% block content %}
+<div style="max-width:1000px;margin:30px auto;padding:20px;">
+    <h1>Surplus Donation — Test Cases</h1>
+    <p>Verify pickup eligibility and workflow safety conditions.</p>
 
-<style>
-  .test-intro {
-    margin-bottom: 24px;
-  }
-
-  .test-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-    margin: 24px 0;
-  }
-
-  .test-card {
-    background: var(--card, #ffffff);
-    border: 1px solid var(--border, #e3e9e3);
-    border-radius: 14px;
-    padding: 20px;
-  }
-
-  .test-card h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-  }
-
-  .test-id {
-    color: #176B45;
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: .5px;
-  }
-
-  .test-card p {
-    line-height: 1.6;
-  }
-
-  .test-label {
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-
-  .test-result {
-    padding: 12px;
-    border-radius: 8px;
-    background: #f3f7f3;
-    margin-top: 12px;
-    line-height: 1.5;
-  }
-
-  .test-callout {
-    padding: 22px;
-    border-radius: 14px;
-    background: #fff4df;
-    margin-top: 24px;
-    overflow-wrap: anywhere;
-  }
-
-  .test-callout pre {
-    background: #173d2c;
-    color: white;
-    padding: 14px;
-    border-radius: 8px;
-    overflow-x: auto;
-  }
-
-  .test-note {
-    color: #59665e;
-    font-size: 14px;
-    line-height: 1.6;
-  }
-
-  @media (max-width: 650px) {
-    .test-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
-
-<section class="page-heading test-intro">
-  <p class="eyebrow">VALIDATION & QUALITY CHECKS</p>
-  <h1>FoodBridge AI — Workflow Test Cases</h1>
-  <p>
-    Verify food safety, human approval, NGO acceptance and pickup
-    location safety before presenting the project.
-  </p>
-</section>
-
-<div class="test-grid">
-
-  <article class="test-card">
-    <span class="test-id">TEST CASE 01</span>
-    <h3>TC1 · Fresh Food & NGO Matching</h3>
-
-    <p>
-      Verify that fresh food passes the configured safety checks
-      and that an eligible NGO is matched based on category,
-      location and available capacity.
-    </p>
-
-    <div class="test-result">
-      <div class="test-label">Expected result</div>
-      Eligible donation is matched appropriately. Human approval
-      is required before the pickup workflow proceeds.
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:20px 0;">
+        <button id="runButton" onclick="runTests()"
+            style="background:#176B45;color:white;padding:12px 22px;
+            border:0;border-radius:8px;cursor:pointer;font-weight:bold;">
+            Run Tests
+        </button>
+        <button onclick="location.reload()"
+            style="padding:12px 22px;border:1px solid #ccc;
+            border-radius:8px;cursor:pointer;">
+            Reset Results
+        </button>
     </div>
 
-    <p class="test-note">
-      <strong>Verify:</strong> Food age, safety decision, NGO match
-      and approval status.
-    </p>
-  </article>
+    <p id="message" role="status"></p>
+    <h2 id="summary">Tests not run yet</h2>
 
-  <article class="test-card">
-    <span class="test-id">TEST CASE 02</span>
-    <h3>TC2 · Expired Cooked Food</h3>
-
-    <p>
-      Verify that cooked food exceeding the configured four-hour
-      safety window is rejected.
-    </p>
-
-    <div class="test-result">
-      <div class="test-label">Expected result</div>
-      Food is rejected, matching is skipped and pickup is blocked.
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:#176B45;color:white;">
+                    <th style="padding:12px;text-align:left;">Test Case</th>
+                    <th style="padding:12px;text-align:left;">Expected Result</th>
+                    <th style="padding:12px;text-align:left;">Actual Result</th>
+                    <th style="padding:12px;text-align:left;">Status</th>
+                </tr>
+            </thead>
+            <tbody id="results">
+                <tr>
+                    <td colspan="4" style="padding:16px;text-align:center;">
+                        Click Run Tests to execute all test cases.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <p class="test-note">
-      <strong>Verify:</strong> Food age, rejection reason and
-      absence of an eligible pickup.
-    </p>
-  </article>
+    <h2 style="margin-top:30px;">Test Scenario Details</h2>
 
-  <article class="test-card">
-    <span class="test-id">TEST CASE 03</span>
-    <h3>TC3 · NGO Acceptance Pending</h3>
+    <section style="padding:16px;margin:12px 0;border:1px solid #ddd;border-radius:10px;">
+        <h3>TC1 — All Pickup Conditions Satisfied</h3>
+        <p><b>Condition:</b> NGO accepted the donation and location is confirmed.</p>
+        <p><b>Expected:</b> ALLOW pickup.</p>
+    </section>
 
-    <p>
-      Verify that an NGO-pending donation cannot be marked as
-      collected before the NGO accepts it.
-    </p>
+    <section style="padding:16px;margin:12px 0;border:1px solid #ddd;border-radius:10px;">
+        <h3>TC2 — NGO Has Not Accepted</h3>
+        <p><b>Condition:</b> NGO acceptance is false.</p>
+        <p><b>Expected:</b> BLOCK pickup.</p>
+    </section>
 
-    <div class="test-result">
-      <div class="test-label">Expected result</div>
-      Donation remains pending. Collection is blocked until
-      the required acceptance and pickup checks are complete.
-    </div>
+    <section style="padding:16px;margin:12px 0;border:1px solid #ddd;border-radius:10px;">
+        <h3>TC3 — Location Not Confirmed</h3>
+        <p><b>Condition:</b> NGO accepted, but location is not confirmed.</p>
+        <p><b>Expected:</b> BLOCK pickup.</p>
+    </section>
 
-    <p class="test-note">
-      <strong>Verify:</strong> Donation status, pickup status
-      and collection restrictions.
-    </p>
-  </article>
-
-  <article class="test-card">
-    <span class="test-id">TEST CASE 04</span>
-    <h3>TC4 · Drop-off Location Changed</h3>
-
-    <p>
-      Verify that changing the restaurant's drop-off address
-      invalidates the previous location confirmation.
-    </p>
-
-    <div class="test-result">
-      <div class="test-label">Expected result</div>
-      Location confirmation resets. Collection remains blocked
-      until the NGO confirms the updated address.
-    </div>
-
-    <p class="test-note">
-      <strong>Verify:</strong> Updated address, confirmation flag
-      and pickup readiness.
-    </p>
-  </article>
-
+    <section style="padding:16px;margin:12px 0;border:1px solid #ddd;border-radius:10px;">
+        <h3>TC4 — Donation Not Ready</h3>
+        <p><b>Condition:</b> Donation status is NGO_PENDING.</p>
+        <p><b>Expected:</b> BLOCK pickup.</p>
+    </section>
 </div>
 
-<section class="test-callout">
-  <p class="eyebrow">AUTOMATED VALIDATION</p>
-  <h2>Run the workflow tests</h2>
+<script>
+async function runTests() {
+    const button = document.getElementById("runButton");
+    const message = document.getElementById("message");
+    const summary = document.getElementById("summary");
+    const results = document.getElementById("results");
 
-  <p>
-    Open the VS Code terminal in the project folder and execute:
-  </p>
+    button.disabled = true;
+    button.textContent = "Running...";
+    message.textContent = "Executing test cases...";
+    summary.textContent = "";
+    results.replaceChildren();
 
-  <pre><code>python -m unittest discover -s tests -v</code></pre>
+    try {
+        const response = await fetch("/run-tests", {
+            method: "POST",
+            headers: { "Accept": "application/json" }
+        });
 
-  <p class="test-note">
-    Check the terminal output for each test's actual PASS or FAIL
-    result. A displayed test scenario is not proof that its
-    backend behaviour has passed.
-  </p>
-</section>
+        if (!response.ok) {
+            throw new Error("Request failed: " + response.status);
+        }
 
+        const data = await response.json();
+
+        summary.textContent =
+            data.passed + "/" + data.total + " tests passed";
+
+        data.results.forEach(test => {
+            const tr = document.createElement("tr");
+            tr.style.borderBottom = "1px solid #ddd";
+
+            const values = [
+                test.name,
+                test.expected,
+                test.actual,
+                test.status
+            ];
+
+            values.forEach((value, index) => {
+                const td = document.createElement("td");
+                td.textContent = value;
+                td.style.padding = "12px";
+
+                if (index === 3) {
+                    td.style.fontWeight = "bold";
+                    td.style.color =
+                        value === "PASS" ? "#176B45" : "#c62828";
+                }
+
+                tr.appendChild(td);
+            });
+
+            results.appendChild(tr);
+        });
+
+        message.textContent = "Test execution completed.";
+    } catch (error) {
+        summary.textContent = "Tests could not run";
+        message.textContent =
+            "Check reviewer login, /run-tests route and Render logs.";
+        console.error(error);
+    } finally {
+        button.disabled = false;
+        button.textContent = "Run Tests";
+    }
+}
+</script>
 {% endblock %}
