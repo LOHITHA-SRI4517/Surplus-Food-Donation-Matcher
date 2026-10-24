@@ -26,13 +26,27 @@
             {% if session.get('user_id') %}
 
                 {% if session.get('role') == 'ngo' %}
-                    <a href="{{ url_for('dashboard') }}">NGO Dashboard</a>
+
+                    <a href="{{ url_for('dashboard') }}">
+                        NGO Dashboard
+                    </a>
 
                 {% elif session.get('role') == 'restaurant' %}
-                    <a href="{{ url_for('donations_page') }}">My Donations</a>
+
+                    <a href="{{ url_for('donations_page') }}">
+                        My Donations
+                    </a>
 
                 {% elif session.get('role') == 'reviewer' %}
-                    <a href="{{ url_for('reviewer_dashboard') }}">Review Donations</a>
+
+                    <a href="{{ url_for('reviewer_dashboard') }}">
+                        Review Donations
+                    </a>
+
+                    <a href="{{ url_for('tests_page') }}">
+                        Test Cases
+                    </a>
+
                 {% endif %}
 
                 <span class="user-badge">
@@ -56,6 +70,7 @@
 
             {% endif %}
         </nav>
+
     </div>
 </header>
 
@@ -78,7 +93,9 @@
 </main>
 
 <footer class="site-footer">
-    <p>Surplus Donation — Turning surplus into meaningful meals.</p>
+    <p>
+        Surplus Donation — Turning surplus into meaningful meals.
+    </p>
 </footer>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
