@@ -1,23 +1,199 @@
 
 {% extends "base.html" %}
-{% block title %}Workflow Tests | Surplus Donation{% endblock %}
-{% block content %}
-<section class="page-heading">
-  <p class="eyebrow">VALIDATION</p>
-  <h1>Official workflow test scenarios</h1>
-  <p>Run automated assertions in the terminal before claiming the scenarios pass.</p>
-</section>
-<div class="cards">
-  <article class="card"><h3>TC1 Â· Fresh food</h3><p>Eligible food should pass the configured time check and match an NGO with compatible category, city and sufficient capacity.</p></article>
-  <article class="card"><h3>TC2 Â· Expired cooked food</h3><p>Cooked meals older than four hours must be rejected, with matching skipped and pickup blocked.</p></article>
-  <article class="card"><h3>TC3 Â· NGO pending</h3><p>Collection must not proceed before NGO acceptance.</p></article>
-  <article class="card"><h3>TC4 Â· Location changed</h3><p>Collection must remain blocked until the restaurant reconfirms the drop-off location.</p></article>
-</div>
-<section class="callout">
-  <h2>Run the tests</h2>
-  <p>Open the VS Code terminal and run:</p>
-  <pre>python -m unittest discover -s tests -v</pre>
-  <p>Only the actual test output determines whether a test passed or failed.</p>
-</section>
-{% endblock %}
 
+{% block title %}Workflow Tests | FoodBridge AI{% endblock %}
+
+{% block content %}
+
+<style>
+  .test-intro {
+    margin-bottom: 24px;
+  }
+
+  .test-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin: 24px 0;
+  }
+
+  .test-card {
+    background: var(--card, #ffffff);
+    border: 1px solid var(--border, #e3e9e3);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  .test-card h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+  }
+
+  .test-id {
+    color: #176B45;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: .5px;
+  }
+
+  .test-card p {
+    line-height: 1.6;
+  }
+
+  .test-label {
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .test-result {
+    padding: 12px;
+    border-radius: 8px;
+    background: #f3f7f3;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  .test-callout {
+    padding: 22px;
+    border-radius: 14px;
+    background: #fff4df;
+    margin-top: 24px;
+    overflow-wrap: anywhere;
+  }
+
+  .test-callout pre {
+    background: #173d2c;
+    color: white;
+    padding: 14px;
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+
+  .test-note {
+    color: #59665e;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 650px) {
+    .test-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<section class="page-heading test-intro">
+  <p class="eyebrow">VALIDATION & QUALITY CHECKS</p>
+  <h1>FoodBridge AI — Workflow Test Cases</h1>
+  <p>
+    Verify food safety, human approval, NGO acceptance and pickup
+    location safety before presenting the project.
+  </p>
+</section>
+
+<div class="test-grid">
+
+  <article class="test-card">
+    <span class="test-id">TEST CASE 01</span>
+    <h3>TC1 · Fresh Food & NGO Matching</h3>
+
+    <p>
+      Verify that fresh food passes the configured safety checks
+      and that an eligible NGO is matched based on category,
+      location and available capacity.
+    </p>
+
+    <div class="test-result">
+      <div class="test-label">Expected result</div>
+      Eligible donation is matched appropriately. Human approval
+      is required before the pickup workflow proceeds.
+    </div>
+
+    <p class="test-note">
+      <strong>Verify:</strong> Food age, safety decision, NGO match
+      and approval status.
+    </p>
+  </article>
+
+  <article class="test-card">
+    <span class="test-id">TEST CASE 02</span>
+    <h3>TC2 · Expired Cooked Food</h3>
+
+    <p>
+      Verify that cooked food exceeding the configured four-hour
+      safety window is rejected.
+    </p>
+
+    <div class="test-result">
+      <div class="test-label">Expected result</div>
+      Food is rejected, matching is skipped and pickup is blocked.
+    </div>
+
+    <p class="test-note">
+      <strong>Verify:</strong> Food age, rejection reason and
+      absence of an eligible pickup.
+    </p>
+  </article>
+
+  <article class="test-card">
+    <span class="test-id">TEST CASE 03</span>
+    <h3>TC3 · NGO Acceptance Pending</h3>
+
+    <p>
+      Verify that an NGO-pending donation cannot be marked as
+      collected before the NGO accepts it.
+    </p>
+
+    <div class="test-result">
+      <div class="test-label">Expected result</div>
+      Donation remains pending. Collection is blocked until
+      the required acceptance and pickup checks are complete.
+    </div>
+
+    <p class="test-note">
+      <strong>Verify:</strong> Donation status, pickup status
+      and collection restrictions.
+    </p>
+  </article>
+
+  <article class="test-card">
+    <span class="test-id">TEST CASE 04</span>
+    <h3>TC4 · Drop-off Location Changed</h3>
+
+    <p>
+      Verify that changing the restaurant's drop-off address
+      invalidates the previous location confirmation.
+    </p>
+
+    <div class="test-result">
+      <div class="test-label">Expected result</div>
+      Location confirmation resets. Collection remains blocked
+      until the NGO confirms the updated address.
+    </div>
+
+    <p class="test-note">
+      <strong>Verify:</strong> Updated address, confirmation flag
+      and pickup readiness.
+    </p>
+  </article>
+
+</div>
+
+<section class="test-callout">
+  <p class="eyebrow">AUTOMATED VALIDATION</p>
+  <h2>Run the workflow tests</h2>
+
+  <p>
+    Open the VS Code terminal in the project folder and execute:
+  </p>
+
+  <pre><code>python -m unittest discover -s tests -v</code></pre>
+
+  <p class="test-note">
+    Check the terminal output for each test's actual PASS or FAIL
+    result. A displayed test scenario is not proof that its
+    backend behaviour has passed.
+  </p>
+</section>
+
+{% endblock %}
