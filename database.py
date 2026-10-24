@@ -34,9 +34,8 @@ def log_event(db, donation_id, event_type, message):
 
 def create_users_table(db):
     """
-    Create the users table.
-    Safely migrate older tables to support the reviewer role
-    without intentionally deleting existing user accounts.
+    Create users table and migrate older schemas to support reviewer role.
+    Preserve existing accounts and their IDs where possible.
     """
     existing = db.execute(
         """
@@ -45,76 +44,42 @@ def create_users_table(db):
         """
     ).fetchone()
 
-    if existing:
-        table_sql = (existing["sql"] or "").lower()
-
-        if "reviewer" not in table_sql:
-            old_columns = {
-                row["name"]
-                for row in db.execute(
-                    "PRAGMA table_info(users)"
-                ).fetchall()
-            }
-
-            db.execute(
-                "ALTER TABLE users RENAME TO users_old_migration"
+    if not existing:
+        db.execute(
+            """
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL
+                    CHECK(role IN ('restaurant', 'ngo', 'reviewer')),
+                restaurant_name TEXT,
+                ngo_id INTEGER,
+                FOREIGN KEY (ngo_id) REFERENCES ngos(id)
             )
+            """
+        )
+        return
 
-            db.execute(
-                """
-                CREATE TABLE users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL
-                        CHECK(role IN ('restaurant', 'ngo', 'reviewer')),
-                    restaurant_name TEXT,
-                    ngo_id INTEGER,
-                    FOREIGN KEY (ngo_id) REFERENCES ngos(id)
-                )
-                """
-            )
+    table_sql = (existing["sql"] or "").lower()
 
-            required_columns = {
-                "id",
-                "username",
-                "password_hash",
-                "role",
-                "restaurant_name",
-                "ngo_id",
-            }
+    if "reviewer" in table_sql:
+        return
 
-            if required_columns.issubset(old_columns):
-                db.execute(
-                    """
-                    INSERT INTO users (
-                        id, username, password_hash, role,
-                        restaurant_name, ngo_id
-                    )
-                    SELECT
-                        id, username, password_hash, role,
-                        restaurant_name, ngo_id
-                    FROM users_old_migration
-                    """
-                )
-            elif {
-                "username",
-                "password_hash",
-                "role",
-            }.issubset(old_columns):
-                db.execute(
-                    """
-                    INSERT INTO users (
-                        username, password_hash, role
-                    )
-                    SELECT username, password_hash, role
-                    FROM users_old_migration
-                    """
-                )
+    old_columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(users)").fetchall()
+    }
 
-            db.execute("DROP TABLE users_old_migration")
+    db.execute("PRAGMA foreign_keys = OFF")
 
-    else:
+    try:
+        db.execute("BEGIN")
+
+        db.execute(
+            "ALTER TABLE users RENAME TO users_old_migration"
+        )
+
         db.execute(
             """
             CREATE TABLE users (
@@ -130,12 +95,67 @@ def create_users_table(db):
             """
         )
 
+        if {
+            "id",
+            "username",
+            "password_hash",
+            "role",
+            "restaurant_name",
+            "ngo_id",
+        }.issubset(old_columns):
+            db.execute(
+                """
+                INSERT INTO users (
+                    id, username, password_hash, role,
+                    restaurant_name, ngo_id
+                )
+                SELECT
+                    id, username, password_hash, role,
+                    restaurant_name, ngo_id
+                FROM users_old_migration
+                """
+            )
+        elif {
+            "username",
+            "password_hash",
+            "role",
+        }.issubset(old_columns):
+            db.execute(
+                """
+                INSERT INTO users (
+                    username, password_hash, role
+                )
+                SELECT username, password_hash, role
+                FROM users_old_migration
+                """
+            )
+
+        db.execute("DROP TABLE users_old_migration")
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.execute("PRAGMA foreign_keys = ON")
+
 
 def migrate_pickup_evidence_columns(db):
     """
-    Add pickup evidence fields to an existing database.
+    Add pickup evidence and location confirmation fields to older databases.
     Existing pickup records are preserved.
     """
+    table_exists = db.execute(
+        """
+        SELECT 1 FROM sqlite_master
+        WHERE type = 'table' AND name = 'pickups'
+        """
+    ).fetchone()
+
+    if not table_exists:
+        return
+
     existing_columns = {
         row["name"]
         for row in db.execute(
@@ -148,6 +168,9 @@ def migrate_pickup_evidence_columns(db):
         "collected_at": "TEXT",
         "collected_by": "TEXT",
         "collection_notes": "TEXT",
+        "location_confirmed": (
+            "INTEGER NOT NULL DEFAULT 0"
+        ),
     }
 
     for column_name, column_type in required_columns.items():
@@ -221,7 +244,7 @@ def init_db():
             """
         )
 
-        # Safely add evidence columns when upgrading an older database.
+        # Migrate older pickup tables without deleting existing records.
         migrate_pickup_evidence_columns(db)
 
         demo_ngos = [
@@ -277,12 +300,17 @@ def init_db():
                 ngo,
             )
 
-        # Create or safely migrate users after the NGOs table exists.
+        # Create or migrate users after the NGOs table exists.
         create_users_table(db)
 
-        # Demo accounts are inserted only when they do not already exist.
         demo_users = [
-            ("REST001", "demo123", "restaurant", "Green Leaf Kitchen", None),
+            (
+                "REST001",
+                "demo123",
+                "restaurant",
+                "Green Leaf Kitchen",
+                None,
+            ),
             ("HOPE001", "hope123", "ngo", None, "HOPE001"),
             ("AKSH001", "akshaya123", "ngo", None, "AKSH001"),
             ("HELP001", "help123", "ngo", None, "HELP001"),
@@ -332,4 +360,4 @@ def init_db():
 if __name__ == "__main__":
     init_db()
     print("FoodBridge database initialized successfully.")
-    print("Pickup evidence columns are ready.")
+    print("Pickup evidence and location confirmation columns are ready.")
