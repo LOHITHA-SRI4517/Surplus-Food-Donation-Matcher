@@ -7,7 +7,7 @@ from pathlib import Path
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, session, abort, make_response, send_from_directory
+    flash, session, abort, make_response, send_from_directory, jsonify
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -1009,9 +1009,7 @@ def collect_pickup(donation_id):
             return redirect(home_for_role())
 
         allowed = can_create_pickup(
-            "APPROVED"
-            if donation["status"] == "NGO_ACCEPTED"
-            else donation["status"],
+            donation["status"],
             donation["status"] == "NGO_ACCEPTED",
             bool(pickup["location_confirmed"]),
         )
@@ -1134,8 +1132,42 @@ def view_pickup_evidence(donation_id):
 
 @app.route("/tests")
 @login_required
+@role_required("reviewer")
 def tests_page():
     return render_template("test_cases.html")
+
+
+@app.route("/run-tests", methods=["POST"])
+@login_required
+@role_required("reviewer")
+def run_tests():
+    checks = [
+        ("TC1 - All conditions satisfied",
+         "NGO_ACCEPTED", True, True, True),
+        ("TC2 - NGO not accepted",
+         "NGO_ACCEPTED", False, True, False),
+        ("TC3 - Location not confirmed",
+         "NGO_ACCEPTED", True, False, False),
+        ("TC4 - Donation not ready",
+         "NGO_PENDING", True, True, False),
+    ]
+
+    results = []
+    for name, status, accepted, confirmed, expected in checks:
+        actual = can_create_pickup(status, accepted, confirmed)
+        results.append({
+            "name": name,
+            "expected": "ALLOW" if expected else "BLOCK",
+            "actual": "ALLOW" if actual else "BLOCK",
+            "status": "PASS" if actual == expected else "FAIL",
+        })
+
+    passed = sum(1 for result in results if result["status"] == "PASS")
+    return jsonify({
+        "results": results,
+        "passed": passed,
+        "total": len(results),
+    })
 
 
 @app.errorhandler(403)
